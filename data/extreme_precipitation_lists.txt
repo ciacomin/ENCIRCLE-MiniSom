@@ -1,0 +1,12 @@
+This folder contains Excel files with data on registered precipitation for each warning area, which shape files were provided by the Italian Department of Civil Protection. The data is available for three different precipitation datasets:
+  - ArCIS : arcis3_19610101_20231231_direct_north_withArea
+  - CERRA-Land : cerra-land6_19840801_20210430_direct_north_withArea (North-Central Italy), cerra-land6_19840801_20210430_direct_italy_withArea (all of Italy)
+  - MSWEP : mswep_19800101_20191231_direct_north_withArea
+
+Additionally here you store the data (possibly .nc files) with a separate folder for each dataset. This data here is not provided but:
+    - The ArCIS precipitation dataset is available online at https://www.arcis.it/wp/prodotti/.
+    - The MSWEP precipitation product can be requested online at https://www.gloh2o.org/mswep/. 
+    - CERRA-Land and ERA5 can be downloaded from the Copernicus Climate Change Service.
+
+Eventually this method can be applied to any other precipitation product by producing a new list of extreme events and by changing accordingly a few lines of code. 
+
