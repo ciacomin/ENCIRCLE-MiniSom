@@ -1,4 +1,5 @@
-This folder contains Excel files with data on registered precipitation for each warning area, which shape files were provided by the Italian Department of Civil Protection. The data is available for three different precipitation datasets:
+This folder contains Excel files with data on registered precipitation for each warning area, which shape files were provided by the Italian Department of Civil Protection. 
+The data is available for three different precipitation datasets:
   - ArCIS : arcis3_19610101_20231231_direct_north_withArea
   - CERRA-Land : cerra-land6_19840801_20210430_direct_north_withArea (North-Central Italy), cerra-land6_19840801_20210430_direct_italy_withArea (all of Italy)
   - MSWEP : mswep_19800101_20191231_direct_north_withArea
