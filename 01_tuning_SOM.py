@@ -100,8 +100,9 @@ extreme_pr_days_list = extreme_pr_days.tolist()       # List object
 print("   number of extremes: ", str(len(extreme_pr_days_list)))
 
 # if you want to save them 
-#print("I am saving "+ extreme_list_str + '_extreme_dates_' + domain_region + '.npy')
-#np.save(output_path + extreme_list_str + '_extreme_dates_' + domain_region + '.npy', np.array(extreme_pr_days_list, dtype=object), allow_pickle=True)
+#print("I am saving "+ pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy')
+#np.save(output_path + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy', np.array(extreme_pr_days_list, dtype=object), allow_pickle=True)
+
 
 #%% 1.1) if you want directly to load the extremes uncomment
 # If you have a list of extreme days you can select them directly 
@@ -115,8 +116,8 @@ print("   number of extremes: ", str(len(extreme_pr_days_list)))
 # #domain_region = "Italy"
 # domain_region  = "North-Italy"
 # 
-# print("I'm loading the extremes of "+ extreme_list_str + '_extreme_dates_' + domain_region + '.npy')
-# extreme_pr_days_list = np.load(output_path + extreme_list_str + '_extreme_dates_' + domain_region + '.npy', allow_pickle=True)
+# print("I'm loading the extremes of "+ pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy')
+# extreme_pr_days_list = np.load(output_path + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy', allow_pickle=True)
 # print(extreme_pr_days_list.shape)
 # =============================================================================
 
@@ -238,7 +239,7 @@ folderpath_tuning = 'tuningFinale/'  # Output of tuning section, if you want to 
 # first is to assess the best function, then sigma and LR
 
 # Explained variance vs QE vs Neighborhood function
-som_col = 2
+som_col = 3
 som_row = 2
 som_shape =(som_row, som_col)
 min_som = min(som_col, som_row)
@@ -264,20 +265,18 @@ for neighborhood_function_index in range(len(neighborhood_function_list)):
         
     for n_index in n_index_list:
         print("n_comp.: ", n_index)
-        pca = PCA(n_components=n_index) # Keeps 99% of the variance
+        pca = PCA(n_components=n_index) # Keeps % of the variance
         data_train_pca = pca.fit_transform(data_train)
         data_test_pca = pca.transform(data_test)
         #all_data_pca = pca.transform(all_data_std)
         
-        data_chosen = data_train_pca
-        
-        input_length = len(data_chosen[0])  #This is value is the the length of the latitude X longitude. It is the second value in the data_train.shape step. 
+        input_length = len(data_train_pca[0])  #This is value is the the length of the latitude X longitude. It is the second value in the data_train.shape step. 
         
         # SOM
         era5_hourly_som1 = minisom.MiniSom(som_row, som_col, input_len = input_length, sigma = sigma, learning_rate=learning_rate, neighborhood_function=neighborhood_function, decay_function = asymptotic_decay)
-        era5_hourly_som1.random_weights_init(data_chosen)
+        era5_hourly_som1.random_weights_init(data_train_pca)
         # train som
-        era5_hourly_som1.train(data_chosen, num_iteration=100000,random_order=True, verbose=True) 
+        era5_hourly_som1.train(data_train_pca, num_iteration=100000,random_order=True, verbose=True) 
         
         q_error = round(era5_hourly_som1.quantization_error(data_test_pca),3) # we assess the q_error on the test set
         q_error_list += [q_error]
@@ -285,12 +284,6 @@ for neighborhood_function_index in range(len(neighborhood_function_list)):
         t_error_list += [t_error]
         #if q_error < q_win:
         #    q_win = q_error
-        
-    index_first_min =0
-    for i in range(1, len(q_error_list)):
-        if q_error_list[i] < q_error_list[i-1]:
-            index_first_min = i
-            break
         
     legend_plot = str(neighborhood_function)
     plt.plot(n_index_list, q_error_list, label=legend_plot)
@@ -300,7 +293,8 @@ for neighborhood_function_index in range(len(neighborhood_function_list)):
     q_error_list_cicle += [q_error_list]
     t_error_list_cicle += [t_error_list]
     
-plt.savefig(folderpath_tuning + "1_" + pr_dataset_str + "_QE_test_variable_nf_LR0_0005_sigma1.svg", format="svg")
+plt.savefig(folderpath_tuning + "1_" + pr_dataset_str + "_" + str(start_year) + "_" + str(end_year) + "_" + str(som_row) + "x" + str(col) + "_QE_test_variable_nf_LR0_0005_sigma1.svg", format="svg")
+
 
 #%% Assesing sigma and LR
 
@@ -365,8 +359,9 @@ for l_rate_index in range(len(learning_rate_list)):
     q_error_list_cicle += [q_error_list]
     t_error_list_cicle += [t_error_list]
     
-plt.savefig(folderpath+ "2_" + pr_dataset_str + "_" + str(som_row) + "x" + str(col) + "_QE_test_LR_sigma_variable_gaussian.svg", format="svg")
-plt.savefig(folderpath+ "2_" + pr_dataset_str + "_" + str(som_row) + "x" + str(col) + "_QE_test_LR_sigma_variable_gaussian.png")
+plt.savefig(folderpath+ "2_" + pr_dataset_str + "_" + str(start_year) + "_" + str(end_year) + "_" + str(som_row) + "x" + str(col) + "_QE_test_LR_sigma_variable_gaussian.svg", format="svg")
+plt.savefig(folderpath+ "2_" + pr_dataset_str + "_" + str(start_year) + "_" + str(end_year) + "_" + str(som_row) + "x" + str(col) + "_QE_test_LR_sigma_variable_gaussian.png")
+
 
 
 
