@@ -107,16 +107,9 @@ print("   number of extremes: ", str(len(extreme_pr_days_list)))
 #%% 1.1) if you want directly to load the extremes uncomment
 # If you have a list of extreme days you can select them directly 
 # If you are on Spyder, comment with Ctrl + 4 and uncomment with Ctrl + 5
+
 # =============================================================================
-# extreme_list_str = "ARCIS"  
-# #extreme_list_str = "MSWEP"
-# #extreme_list_str = "CERRA_LAND"
-# 
-# # domain
-# #domain_region = "Italy"
-# domain_region  = "North-Italy"
-# 
-# print("I'm loading the extremes of "+ pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy')
+# print("I'm loading the extremes of " + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy')
 # extreme_pr_days_list = np.load(output_path + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy', allow_pickle=True)
 # print(extreme_pr_days_list.shape)
 # =============================================================================
