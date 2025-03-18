@@ -64,13 +64,8 @@ output_path ="output_SOM/" # the output path
 
 # datasets
 data_path_ERA5 = "data/ERA5/" 
-data_path_arcis = "data/ArCIS"
-data_path_mswep = "data/MSWEP"
-data_path_cerra = "data/CERRA_LAND"
+
 ################################################################
-
-
-
 #os.chdir('C:\\your_directory') # if you need to change to your directory 
 #%% 0) Dataset and variable selection 
 # Chose first which dataset and domain region
@@ -98,6 +93,10 @@ extreme_pr_days = extreme_pr_days_df["Time"] # Series/Dataframe object
 extreme_pr_days_list = extreme_pr_days.tolist()       # List object 
 print("   number of extremes: ", str(len(extreme_pr_days_list)))
 
+# if you want to save them 
+#print("I am saving "+ extreme_list_str + '_extreme_dates_' + domain_region + '.npy')
+#np.save(output_path + extreme_list_str + '_extreme_dates_' + domain_region + '.npy', np.array(extreme_pr_days_list, dtype=object), allow_pickle=True)
+
 #%% 1.1) if you want directly to load the extremes uncomment
 # If you have a list of extreme days you can select them directly 
 # If you are on Spyder, comment with Ctrl + 4 and uncomment with Ctrl + 5
@@ -108,8 +107,6 @@ print("   number of extremes: ", str(len(extreme_pr_days_list)))
 # 
 # # domain
 # #domain_region = "Italy"
-# #domain_region = "Sicilia"
-# #domain_region = "Puglia"
 # domain_region  = "North-Italy"
 # 
 # print("I'm loading the extremes of "+ extreme_list_str + '_extreme_dates_' + domain_region + '.npy')
