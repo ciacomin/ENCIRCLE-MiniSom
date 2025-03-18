@@ -363,6 +363,10 @@ plt.savefig(folderpath_tuning+ "2_" + pr_dataset_str + "_" + str(start_year) + "
 plt.savefig(folderpath_tuning+ "2_" + pr_dataset_str + "_" + str(start_year) + "_" + str(end_year) + "_" + str(som_row) + "x" + str(col) + "_QE_test_LR_sigma_variable_gaussian.png")
 
 
+## MY FINAL CONFIGURATION
+# gaussian
+# ARCIS, 2X2: sigma = 1, LR = 0.002
+# CERRA Land, 3x2: sigma = 1, LR = 0.005
 
 
 
