@@ -202,3 +202,153 @@ print(data_train_pca.shape)
 som_names = pr_dataset_str + "_" + region_domain + "_" + SOM_domain + "_" + som_variables_str + "_PCA_" + str(perc_pca) + "_" + str(som_col) + "by" + str(som_row) + "_LR" + str(learning_rate) + "_sig" + str(sigma) + "_n_"
 print(som_names)
 
+#%% Create the SOM
+# we train on data_train_pca
+# but we test the q_error on the data_test_pca
+
+input_length = len(data_train_pca[0])
+for i in range(number_of_soms):   #The number of SOMs that will be generated. 
+    # initialize random weights
+    era5_hourly_som1 = minisom.MiniSom(som_row, som_col, input_len = input_length, sigma = sigma, learning_rate=learning_rate, neighborhood_function='gaussian', decay_function = asymptotic_decay)
+    era5_hourly_som1.random_weights_init(data_train_pca)
+    # train som
+    era5_hourly_som1.train(data_train_pca, num_iteration=100000,random_order=True, verbose=True)
+    q_error = era5_hourly_som1.quantization_error(data_test_pca)
+    
+    #Add the details of the SOM settings into the name of the file so that you know what the SOM is showing.
+    with open(folderpath_SOMs + som_names +str(i+1)+'.p', 'wb') as outfile: #this is how you save the file, the str(i) is a unique name
+        pickle.dump(era5_hourly_som1, outfile)
+    weights = era5_hourly_som1._weights
+    q_error_list += [q_error]
+    i+=1
+    if q_error < q_win:
+        q_win = q_error
+        win_weights = era5_hourly_som1
+        
+print('\007')
+#%%
+names = ([os.path.splitext(os.path.split(x)[-1])[0] for x in glob.glob(folderpath_SOMs + som_names + '*')])
+filepaths = glob.glob(folderpath_SOMs + som_names + '*')  #this is showing the path and the given file
+print(names) # this can give you the order, the second one is number 10 not 2  
+
+#%% Master SOM
+# we want to operate just on the "best" or "Master" SOM. 
+# So we need to calculate the performance on the test set
+# we want to calculate QE and TE on both train and data test 
+
+q_error_list_train = []
+t_error_list_train = []
+
+q_error_list_test = []
+t_error_list_test = []
+
+data_train_chosen = data_train_pca
+data_test_chosen = data_test_pca
+all_data_chosen = all_data_pca
+for path, name in zip(filepaths, names):
+    with open (path, 'rb') as f:
+        file = pickle.load(f) #This is loading every single som in that location
+        q_error_train = round(file.quantization_error(data_train_chosen),3) #this is grabbing every q error out to 3 decimal places
+        t_error_train = round(file.topographic_error(data_train_chosen),3) #this is grabbing ever topographic error out to 3 decimal places
+        q_error_list_train += [q_error_train]
+        t_error_list_train += [t_error_train]
+        
+        q_error_test = round(file.quantization_error(data_test_chosen),3) #this is grabbing every q error out to 3 decimal places
+        t_error_test = round(file.topographic_error(data_test_chosen),3) #this is grabbing ever topographic error out to 3 decimal places
+        q_error_list_test += [q_error_test]
+        t_error_list_test += [t_error_test]
+        
+mean_qerror_train = np.mean(q_error_list_train)
+mean_qerror_test  = np.mean(q_error_list_test)
+
+mean_terror_train = np.mean(t_error_list_train)
+mean_terror_test  = np.mean(t_error_list_test)
+
+index_best_QE = np.where(q_error_list_test == np.min(q_error_list_test))[0][0]
+print("qerr. best is " + names[index_best_QE])
+print(q_error_list_test)
+print(" ")
+
+index_best_TE = np.where(t_error_list_test == np.min(t_error_list_test))[0][0]
+print("topoerr. best is " + names[index_best_TE])
+print(t_error_list_test)
+print(" ")
+
+#%%
+# t_error when using PCA is usually really small (but you can check)
+# so we consider as best the SOM that has the minimum QE
+name_best=names[index_best_QE]
+master_som_name = name_best
+print("The best is " + str(name_best))
+som = pickle.load(open(filepaths[index_best_QE], 'rb'))
+weights = som._weights
+print(weights.shape)
+
+# Reverse PCA to return to original features
+data_prototypes_pca_inverse = pca.inverse_transform(weights)
+
+# new dictionary for the new data
+keys = [i for i in product(range(som_row), range(som_col))]  ## DIM OF SOMS
+winmap = {key: [] for key in keys}
+
+#%%
+# We train the SOM on the train set, but we apply it to all 
+data_chosen = all_data_pca
+test_train_all = "all"
+
+winner_coordinates = np.array([som.winner(x) for x in data_chosen]).T
+        
+# with np.ravel_multi_index we convert the bidimensional
+# coordinates to a monodimensional index
+cluster_index = np.ravel_multi_index(winner_coordinates, som_shape)
+silhouette_score(data_chosen, labels=cluster_index, metric='euclidean') # if you want to check the silhouette_score
+
+# =============================================================================
+# plt.figure(figsize=(12,8))
+# for c in np.unique(cluster_index):
+#     plt.scatter(data_chosen[cluster_index == c, 0],
+#         data_chosen[cluster_index == c, 1], label='cluster='+str(c+1), alpha=.7)
+# 
+# # plotting centroids
+# for centroid in som.get_weights():
+#     plt.scatter(centroid[:, 0], centroid[:, 1], marker='x', 
+#                 s=20, linewidths=15, color='k', label='centroid')
+# plt.title('Centroids (' + test_train_all + " set) " + som_variables_str + ". " + pr_dataset_str + " " + region_domain + " " + str(som_col) + "by" + str(som_row) + " n." + name_best[-2:])
+# #plt.savefig(folderpath + pr_dataset_str + "_" + test_train_all + '_centroids_' +name_best+'.svg')
+# #plt.savefig(folderpath + pr_dataset_str + "_" + test_train_all + '_centroids_' +name_best+'.png')
+# plt.legend();
+# =============================================================================
+
+nx = int(len(lat))
+ny = int(len(lon))
+
+# just for graphic reason
+wt_list = [[2, 1], [4, 3]] # ARCIS Central-North
+wt_list = [[3, 4], [1, 2]] # CERRA Central-North 
+wt_list = [[2, 4], [1, 3]] # MSWEP Central-North
+wt_list = [[1, 3, 5], [2, 4, 6]] # CERRA Italy
+
+# Correlation 
+for i, x in enumerate(data_chosen):
+    winmap[som.winner(x)].append(i)
+    
+corr_list = []
+for k in range(weights.shape[0]):
+    for j in range(weights.shape[1]):
+        index_maps = winmap[(k,j)]
+        #print(index_maps) #index of the maps of a single node
+        cluster_maps = [data_chosen[i] for i in index_maps] # maps relative to such indices
+        
+        print("Node " + str(k*weights.shape[1] + j+1))
+        print(" number of maps: " + str((len(cluster_maps))))
+        corr_list_temp = []
+        for i in range(len(cluster_maps)):
+            corr_list_temp += [np.corrcoef(weights[k,j,:], cluster_maps[i])[0,1]]
+    
+        print(" corr.: " + str(np.mean(corr_list_temp))) 
+        corr_list += [np.mean(corr_list_temp)]
+
+        frequencies = som.activation_response(all_data_chosen)
+        freq_perc = frequencies / len(all_data_chosen) * 100   # percentual freq
+
+
