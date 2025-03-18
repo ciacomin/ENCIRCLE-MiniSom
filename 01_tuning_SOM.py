@@ -114,7 +114,7 @@ print("   number of extremes: ", str(len(extreme_pr_days_list)))
 # print(extreme_pr_days_list.shape)
 # =============================================================================
 
-#%% 2) Preparing the SOM - Z500 and mSLP or Z500 and TCWV
+#%% 2) Preparing the SOM - Z500 and mSLP
 
 # Here you choose the domain for the SOM and preparing the files you need
 # 2a) load the variable of interest and do the standardization (per each variable)
