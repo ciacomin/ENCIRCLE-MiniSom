@@ -120,7 +120,6 @@ print("   number of extremes: ", str(len(extreme_pr_days_list)))
 # 2a) load the variable of interest and do the standardization (per each variable)
 # 2b) start the pre-processing with the data train - test split
 # 2c) PCA
-# 2d) save your files, if needed (uncomment)
 
 print("2) PREPARING THE DATA FOR THE SOM ")
 print("   SOM domain: "+ SOM_domain)
