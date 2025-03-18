@@ -33,13 +33,6 @@ import pickle
 
 from sklearn.metrics import silhouette_score
 
-def getList(dict):
-    list = []
-    for key in dict.keys():
-        list.append(key)
-        
-    return list
-
 class RegionDomain(Enum):
     NORTH_ITALY = "north"
     ITALY = "italy"
