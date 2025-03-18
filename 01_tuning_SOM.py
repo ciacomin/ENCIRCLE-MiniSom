@@ -17,7 +17,8 @@ import xarray as xr
 import winsound
 #from xarray import DataArray
 
-os.chdir('C:\\Users\\Criss\\Documents\\Lavoro\\Assegno_2024_2025\\Codici') #if you need to change to your directory 
+os.chdir('C:\\your_directory') # if you need to change to your directory 
+#os.chdir('C:\\Users\\Criss\\Documents\\Lavoro\\Assegno_2024_2025\\Codici') #if you need to change to your directory 
 
 from functions_new_version import *
 from sklearn.preprocessing import StandardScaler
@@ -61,12 +62,17 @@ def select_latlon(ds):
 # PATHS
 path_extremes="data/" # where you have saved the csv files of the extreme
 output_path ="output_SOM/" # the output path
+folderpath_tuning = 'tuningFinale/'  # Output of tuning section, if you want to save your results
+
+#path_extremes="C:/Users/Criss/Documents/Lavoro/Assegno_2024_2025/Dati/" 
+#output_path ="C:/Users/Criss/Documents/Lavoro/Assegno_2024_2025/Codici/SOM/new_extremes/"
+#folderpath_tuning = 'C:/Users/Criss/Documents/Lavoro/Assegno_2024_2025/Codici/tuningFinale/'
 
 # datasets
 data_path_ERA5 = "data/ERA5/" 
+#data_path_ERA5 = "C:/Users/Criss/Documents/Lavoro/Assegno_2024_2025/Dati/ERA5/" 
 
 ################################################################
-#os.chdir('C:\\your_directory') # if you need to change to your directory 
 #%% 0) Dataset and variable selection 
 # Chose first which dataset and domain region
 dataset = Dataset.CERRA_LAND.value                      # chose the desired dataset
