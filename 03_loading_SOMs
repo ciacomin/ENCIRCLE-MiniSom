@@ -535,3 +535,265 @@ fig.tight_layout()
 #plt.savefig(folderpath + pr_dataset_str + '_WT3_annual_trends_' +master_som_name+'.svg', bbox_inches='tight')
 #plt.savefig(folderpath + pr_dataset_str + '_WT3_annual_trends_' +master_som_name+'.png', bbox_inches='tight')
 plt.show()
+
+#%% COMPOSITES
+# Loading ERA5 data
+#Z500
+name_file = data_path_ERA5 + "ERA5_daily_mean_Geop_500hPa_1985_2019_EU3.nc"     # Z500 (not anomaly)
+ds = xr.open_mfdataset(name_file)
+ds.sel(lat = slice(60,25), lon = slice(-13,35))                                 # We select a wider domain to show the composites  
+#ds = dy.sel(time=extreme_list, method="nearest") 
+#print(ds)
+
+# Loading the data into the variables
+z_time_values = ds['time'].values
+z_values = ds['Z'].values
+z_values = z_values / g
+z_values = z_values[:,0,:,:]
+z_raw = (ds['Z'])/g  
+z_lon = ds['lon'].values
+z_lat = ds['lat'].values
+
+# MSLP
+name_file = data_path_ERA5 + "ERA5_daily_mean_mSLP_sfc_1985_2019_EU3.nc"      # MSLP (not anomaly)
+ds = xr.open_mfdataset(name_file)
+ds.sel(lat = slice(60,25), lon = slice(-13,35))                                 # We select a wider domain to show the composites  
+print(ds)
+
+# Loading the data into the variables
+mslp_time_values = ds['time'].values
+mslp_values = ds['MSL'].values
+mslp_values = mslp_values /100
+mslp_raw = (ds['MSL'])/100 #This is the data the NON-anomaly data.
+#lon = ds['lon'].values
+#lat = ds['lat'].values
+
+## IVT data
+name_file = "ERA5_vertical_integral_of_eastward_water_vapour_flux_day_full_sfc_EU_1985_2022.nc"
+path_file = data_path_ERA5 + name_file
+viwve, time_ERA5, xlat_ERA5, xlong_ERA5, _ = ERA5_IVT(path_file, start_year, end_year, "EU3") # We select a wider domain to show the composites  
+viwve = viwve[:,0,:,:]
+
+name_file = "ERA5_vertical_integral_of_northward_water_vapour_flux_day_full_sfc_EU_1985_2022.nc"
+path_file = data_path_ERA5 + name_file
+viwvn, _, _, _, _ = ERA5_IVT(path_file, start_year, end_year, "EU3")
+viwvn = viwvn[:,0,:,:]
+
+## TCWV
+name_file = data_path_ERA5 + "ERA5_total_column_water_vapour_day_full_sfc_EU_1985_2022.nc" 
+ds = xr.open_mfdataset(name_file, preprocess=select_latlon)
+print(ds)
+
+# Loading the data into the variables
+TCWV_time_values = ds['time'].values
+TCWV_values = ds['TCWV'].values
+TCWV_raw = (ds['TCWV']) #This is the data the NON-anomaly data.
+TCWV_lon = ds['lon'].values
+TCWV_lat = ds['lat'].values
+nx = int((TCWV_raw['lat'].size))
+ny = int((TCWV_raw['lon'].size))
+
+#%%
+# generating single composite
+all_data_composites_z500 = single_SOM_map_composite_with_ref_nearest(all_data_pca, time_values, z_values, z_time_values, cluster_nodes_dates)
+all_data_composites_IVTE = single_SOM_map_composite_with_ref_nearest(all_data_pca, time_values, viwve, time_ERA5, cluster_nodes_dates)
+all_data_composites_IVTN = single_SOM_map_composite_with_ref_nearest(all_data_pca, time_values, viwvn, time_ERA5, cluster_nodes_dates)
+all_data_composites_mslp = single_SOM_map_composite_with_ref_nearest(all_data_pca, time_values, mslp_values, mslp_time_values, cluster_nodes_dates)
+all_data_composites_TCWV = single_SOM_map_composite_with_ref_nearest(all_data_pca, time_values, TCWV_values, TCWV_time_values, cluster_nodes_dates)
+
+#%%
+# Generating the different figures 
+# Z500 and mSLP
+single_generate_SOM_composites_Z500_mslp(z_lon, z_lat, all_data_composites_z500, all_data_composites_mslp, som_col, som_row,  master_som_name, folderpath_SOMs, flat_wt_list , "all")
+single_generate_SOM_composites_Z500_mslp_it(z_lon, z_lat, all_data_composites_z500, all_data_composites_mslp, som_col, som_row,  master_som_name, folderpath_SOMs, flat_wt_list , "all")
+
+# Z500, TCWV, IVT
+#single_generate_SOM_composites_Z500_TCWV_IVT(z_lon, z_lat, TCWV_lon, TCWV_lat, data_shaded, data_contour, ivte, ivtn, som_col, som_row, name_som, folderpath, pattern_list, test_or_all=None, chosen_map= "RdYlBu_r"):
+single_generate_SOM_composites_Z500_TCWV_IVT(z_lon, z_lat, TCWV_lon, TCWV_lat, xlong_ERA5, xlat_ERA5, all_data_composites_TCWV, all_data_composites_z500, all_data_composites_IVTE, all_data_composites_IVTN, som_col, som_row,  master_som_name,  folderpath_SOMs, flat_wt_list, "all")
+
+#%% SEASONALITY
+fig = plt.figure(figsize=(20,13))
+#plt.title("Seasonality (all data). SOM " + som_variables_str + " " + pr_dataset_str + " " + region_domain + " " + str(som_col) + "by" + str(som_row) + " Master SOM")
+
+base_index_str = str(som_row) + str(som_col) 
+
+for k in range(len(cluster_nodes_dates)):
+    dates = np.array(cluster_nodes_dates[k])
+    months = dates.astype('datetime64[M]').astype(int) % 12 + 1
+    counts = np.bincount(months)[1:] # [1:] toglie il primo valore relativo al numero 0
+    #print(len(counts))
+    if len(counts) < 12 :
+        N = 12 - len(counts)
+        counts = np.pad(counts, (0, N), 'constant')
+        print("missing some month")
+    #print(len(counts))
+    print(counts)
+    label_node = "#" + str(k+1)
+    
+    index_node_str = base_index_str + str(k+1)
+    index_node = int(index_node_str)
+    print(index_node)
+    
+    counts_series = pd.Series(counts)
+    ax = fig.add_subplot(index_node)
+    ax.set_axis_off()
+    ax.axis('off')
+    #ax.pie(counts, labels=month_str, cmap=seasonal_colormap)
+    counts_series.plot.pie(labels=month_str, cmap=seasonal_colormap, autopct=lambda pct: func(pct, counts), counterclock=False, startangle=-270, fontsize=18)
+
+plt.axis('off')
+#plt.savefig(folderpath + master_som_name + '_' + '_seasonality_pie_'  + test_or_all + '.png', bbox_inches='tight')
+#plt.savefig(folderpath + master_som_name + '_' + '_seasonality_pie_'  + test_or_all + '.svg', bbox_inches='tight')
+plt.show()    
+
+#%% PRECIPITATION 
+### LOADING THE DATA
+## ARCIS
+pr_file = path_ARCIS + "/ARCIS3_GG_1985-2019_updated_time.nc"
+dy = xr.open_mfdataset(pr_file)
+ds = dy.sel(time=extreme_pr_days_list, method="nearest") 
+pr_time_ARCIS = ds['time'].values
+pr_raw_ARCIS = ds['rr']
+pr_ARCIS = ds['rr'].values
+print("pr shape ", pr_ARCIS.shape)
+
+pr_lon_ARCIS = ds['lon']
+pr_lat_ARCIS = ds['lat']
+pr_nx_ARCIS = int((pr_raw_ARCIS['lat'].size))
+pr_ny_ARCIS = int((pr_raw_ARCIS['lon'].size))
+
+# PERCENTILE
+pr_file_99_ARCIS = path_ARCIS + "/ARCIS3_GG_1985-2019_upd_t_99perc.nc"
+dy = xr.open_mfdataset(pr_file_99_ARCIS)
+pr_ARCIS_99 = dy['rr'].values[0]
+print("pr 99 shape: ", pr_ARCIS_99.shape)
+
+pr_ARCIS_mask = pr_ARCIS_99 / pr_ARCIS_99
+
+#%% MSWEP
+pr_file = path_MSWEP + "/All_precip_MSWEP_1985_2019_italy.nc"
+dy = xr.open_mfdataset(pr_file)
+ds = dy.sel(time=extreme_pr_days_list, method="nearest") 
+pr_time_MSWEP = ds['time'].values
+pr_raw_MSWEP = ds['precipitation']
+pr_MSWEP = ds['precipitation'].values
+print("pr shape ", pr_MSWEP.shape)
+
+pr_lon_MSWEP = ds['lon']
+pr_lat_MSWEP = ds['lat']
+pr_nx_MSWEP = int((pr_raw_MSWEP['lat'].size))
+pr_ny_MSWEP = int((pr_raw_MSWEP['lon'].size))
+
+# 99mo percentile
+pr_file_99 = path_MSWEP + "/Wet_precip_MSWEP_1985_2019_italy_99percentile.nc"
+dy = xr.open_mfdataset(pr_file_99)
+pr_MSWEP_99 = dy['precipitation'].values
+pr_MSWEP_99 = pr_MSWEP_99[0]
+print("pr 99 shape: ", pr_MSWEP_99.shape)
+
+#%% CERRA_Land
+pr_file = path_CERRA + "/All_precip_1984_2021_reg6.nc"
+
+dy = xr.open_mfdataset(pr_file)
+ds = dy.sel(time=extreme_pr_days_list, method="nearest") 
+pr_time_CERRA = ds['time'].values
+#pr_time_MSWEP = ds['time'].dt.date.values
+#pr_data = ds['precipitation'].values
+pr_raw_CERRA = ds['tp']
+pr_CERRA = ds['tp'].values
+print("pr shape ", pr_CERRA.shape)
+
+pr_lon_CERRA = ds['lon']
+pr_lat_CERRA = ds['lat']
+pr_nx_CERRA = int((pr_raw_CERRA['lat'].size))
+pr_ny_CERRA = int((pr_raw_CERRA['lon'].size))
+
+# sea mask
+cerra_mask_file = path_CERRA + "/CERRA_LAND_land_mask_6km.nc"
+dy = xr.open_mfdataset(cerra_mask_file)
+print(dy)
+
+cerra_mask_lon = dy['lon']
+cerra_mask_lat = dy['lat']
+cerra_mask_nx = int((cerra_mask_lat.size))
+cerra_mask_ny = int((cerra_mask_lon.size))
+
+cerra_mask_values = dy["lsm"].values[0]
+
+cerra_mask_values = np.where(cerra_mask_values==0, np.NaN, cerra_mask_values)
+
+# 99mo percentile
+pr_file_99 = path_CERRA + "/Wet_precip_1985_2019_reg6_99percentile.nc"
+
+dy = xr.open_mfdataset(pr_file_99)
+pr_CERRA_99 = dy['tp'].values
+pr_CERRA_99= pr_CERRA_99[0] * cerra_mask_values
+print("pr 99 shape: ", pr_CERRA_99.shape)
+
+#%% CERRA - WARNING AREAS
+pr_file = path_CERRA_wa + "/All_precip_CERRA_LAND_1985_2019_italy_wa_mean.nc"
+
+dy = xr.open_mfdataset(pr_file)
+ds = dy.sel(time=extreme_pr_days_list, method="nearest") 
+pr_time_CERRA = ds['time'].values
+pr_raw_CERRA = ds['tp_mean']
+pr_CERRA = ds['tp_mean'].values
+print("pr shape ", pr_CERRA.shape)
+
+pr_lon_CERRA = ds['lon']
+pr_lat_CERRA = ds['lat']
+pr_nx_CERRA = int((pr_raw_CERRA['lat'].size))
+pr_ny_CERRA = int((pr_raw_CERRA['lon'].size))
+
+# 99mo percentile
+pr_file_99 = path_CERRA_wa + "/Wet_precip_CERRA_LAND_1985_2019_italy_wa_mean_99percentile.nc"
+
+dy = xr.open_mfdataset(pr_file_99)
+#ds = dy.sel(time=extreme_list, method="nearest") 
+pr_CERRA_99 = dy['tp_mean'].values
+pr_CERRA_99= pr_CERRA_99[0]
+print("pr 99 shape: ", pr_CERRA_99.shape)
+#%% COMPOSITES
+print("loading pr " + pr_dataset_str)
+    
+if pr_dataset_str == "ARCIS" :
+    pr = pr_ARCIS
+    pr_time = pr_time_ARCIS
+    pr_99 = pr_ARCIS_99
+    pr_mask = pr_ARCIS_mask
+    
+    pr_lon = pr_lon_ARCIS 
+    pr_lat = pr_lat_ARCIS 
+    pr_nx  = pr_nx_ARCIS 
+    pr_ny  = pr_ny_ARCIS 
+ 
+if pr_dataset_str == "MSWEP" :
+    pr = pr_MSWEP
+    pr_time = pr_time_MSWEP
+    pr_99 = pr_MSWEP_99
+
+    pr_lon = pr_lon_MSWEP 
+    pr_lat = pr_lat_MSWEP 
+    pr_nx  = pr_nx_MSWEP 
+    pr_ny  = pr_ny_MSWEP 
+    
+if pr_dataset_str == "CERRA_LAND" :
+    pr = pr_CERRA
+    pr_time = pr_time_CERRA
+    pr_99 = pr_CERRA_99
+    #pr_mask = cerra_mask_values
+    
+    pr_lon = pr_lon_CERRA 
+    pr_lat = pr_lat_CERRA 
+    pr_nx  = pr_nx_CERRA 
+    pr_ny  = pr_ny_CERRA 
+
+
+
+nx = len(pr[0])
+print(nx)
+ny = len(pr[0][0])
+print(ny)
+            
+maps_prob_perc = [None for _ in range(len(cluster_nodes_dates)) ]
+
