@@ -75,7 +75,7 @@ end_year = 2019
 pr_days_dataset_filepath = glob.glob(path_extremes + dataset + "*" + region_domain + "*" + "withArea.xlsx" )[0]
 
 print("1) DATASET AND DOMAIN REGION SELECTION ")
-print("   I am computing the extremes for " + dataset)
+print("   I am computing the extremes for " + dataset + " from " + str(start_year) + " to " + str(end_year))
 # here you can select the time period you are interested into
 raw_pr_days_df, cut_pr_days_df = dataframe_cut_xlsx(pr_days_dataset_filepath, start_year, end_year, True)      # we want 1985 - 2019 period
 # here you can select a spatial filter 
