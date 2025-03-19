@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Mar 17 15:28:54 2025
-
 @author: ciacomin
 
 # This file manages the tuning step
