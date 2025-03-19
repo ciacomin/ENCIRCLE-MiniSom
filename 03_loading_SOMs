@@ -1,0 +1,375 @@
+"""
+@author: ciacomin
+
+Loading SOMs and performing analysis
+"""
+
+import os
+# Fundamental libreries
+import numpy as np
+import pandas as pd
+import glob
+from enum import Enum
+import xarray as xr
+import winsound
+
+# figures
+import geopandas as gpd
+import cartopy.crs as ccrs
+crs = ccrs.PlateCarree()
+import cartopy.feature as cfeature
+from matplotlib import ticker
+
+os.chdir('C:\\your_directory') # if you need to change to your directory 
+
+from function_SOMs import *
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from itertools import product
+
+#import for the SOM
+import minisom
+from minisom import asymptotic_decay
+from datetime import date
+import pickle
+
+from sklearn.metrics import silhouette_score
+
+class RegionDomain(Enum):
+    NORTH_ITALY = "north"
+    ITALY = "italy"
+    
+class Dataset(Enum):
+    CERRA_LAND = "cerra-land6"
+    ARCIS = "arcis3"
+    MSWEP = "mswep"
+    
+class DatasetString(Enum):
+    CERRA_LAND = "CERRA_LAND"
+    ARCIS = "ARCIS"
+    MSWEP = "MSWEP"
+    
+def select_latlon(ds):
+    # this function selects the domain for the SOMs
+    
+    return ds.sel(lat = slice(52,27), lon = slice(-13,35)) # 
+
+# PATHS
+path_extremes="data/" # where you have saved the csv files of the extreme
+output_path ="output_SOM/" # the output path
+#folderpath_tuning = 'tuningFinale/'  # Output of tuning section, if you want to save your results
+folderpath_SOMs = 'output_SOM/SOMs/'
+
+# datasets
+data_path_ERA5 = "data/ERA5/" 
+################################################################
+
+## MY FINAL CONFIGURATION
+# gaussian
+# 1985 - 2019
+# ARCIS, 2x2: sigma = 1, LR = 0.002
+# CERRA Land, 3x2: sigma = 1, LR = 0.005
+
+# 1984 - 2021
+# CERRA Land, 3x2: sigma = 0.95, LR = 0.0008
+
+#%% 0) Dataset and variable selection 
+# Chose first which dataset and domain region
+dataset = Dataset.CERRA_LAND.value                      # chose the desired dataset
+pr_dataset_str = DatasetString.CERRA_LAND.value         # same as before 
+region_domain = RegionDomain.ITALY.value                # chose the desired region domain
+# Chose the domain for the SOM
+SOM_domain = "EU5" #SOM domain
+
+start_year = 1985
+end_year = 2019
+
+#%% 1) Load the extreme dates 
+
+print("I'm loading the extremes of " + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy')
+extreme_pr_days_list = np.load(output_path + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy', allow_pickle=True)
+print(extreme_pr_days_list.shape)
+
+#%% 2) Preparing the SOM - Z500 and mSLP
+
+# Here you choose the domain for the SOM and preparing the files you need
+# 2a) load the variable of interest and do the standardization (per each variable)
+# 2b) start the pre-processing with the data train - test split
+# 2c) PCA
+
+print("2) PREPARING THE DATA FOR THE SOM ")
+print("   SOM domain: "+ SOM_domain)
+#dataset_str = extreme_list_str # CHANGE THIS TO pr_dataset_str
+
+# 2a) load the variable of interest
+print(" -Loading the variables-")
+print("   Loading Z500...")
+
+name_file_z500 = "ERA5_daily_mean_Geop_500hPa_" + str(start_year) + "_" + str(end_year) + "_EU3_anomalies.nc"           # Anomalies of Z500
+dy = xr.open_mfdataset(data_path_ERA5 + name_file_z500, preprocess=select_latlon)   # Here you select the domain
+ds = dy.sel(time=extreme_pr_days_list, method="nearest")                            # Here you select the extreme days
+#print(ds)
+
+time_values = ds['time'].values
+z_values = ds['Z'].values
+z_values = z_values / g
+lon = ds['lon'].values  #they are the same for the two variables 
+lat = ds['lat'].values
+
+nday =int((ds['time'].size))
+nlat = int((ds['lat'].size))
+nlon = int((ds['lon'].size))
+
+#  reshape and standardization ( new_x = x - x_mean / standard_deviation )
+z500_2d = z_values.reshape(nday, -1)        #reshape 
+scaler_z500 = StandardScaler()
+z_values_scaled = scaler_z500.fit_transform(z500_2d)
+
+# loading the second variable
+# MSLP 
+print("   Loading mslp...")
+name_file_mslp = "ERA5_daily_mean_mSLP_sfc_" + str(start_year) + "_" + str(end_year) + "_EU3_anomalies.nc"
+dy = xr.open_mfdataset(data_path_ERA5 + name_file_mslp,    #Xarray features will be used throughout this tutorial 
+                         preprocess=select_latlon)
+ds = dy.sel(time=extreme_pr_days_list, method="nearest") 
+#print(ds)
+
+#time_values = ds['time'].values    #should be the same
+mslp_values = ds['MSL'].values
+mslp_values = mslp_values /100
+som_variables_str = "Z500_mSLP"
+#Z500
+
+mslp_2d = mslp_values.reshape(nday, -1)        #reshape 
+scaler_mslp = StandardScaler()
+mslp_scaled = scaler_mslp.fit_transform(mslp_2d)
+
+# reshape and standardization ( new_x = x - x_mean / standard_deviation )
+z500_reshaped = z_values_scaled.reshape(nday, nlat, nlon)
+print(z500_reshaped.shape)
+mslp_reshaped = mslp_scaled.reshape(nday, nlat, nlon)
+
+print("  check the shape:")
+print("   z500_reshaped", z500_reshaped.shape, "   mslp_reshaped", mslp_reshaped.shape)
+
+temp_array = np.stack([z500_reshaped, mslp_reshaped], axis=-1)   #stack into new axis
+temp_array.shape
+z500_mslp_arr = temp_array.reshape(nday, -1)        #reshape 
+
+print("  stacking Z500 and mSLP,")
+print("   new array shape: ", z500_mslp_arr.shape)
+
+# 2b) Pre-processing
+print(" -Preprocessing data train and test split-")
+# data train - test SPLIT
+print("   lenght of all data:" + str(len(time_values)))
+train_perc = round(len(time_values)*70/100)
+print("   lenght of train data:" + str(train_perc))
+test_perc = len(time_values) - train_perc
+print("   lenght of test data:" + str(test_perc))
+
+data_train = z500_mslp_arr[:train_perc]
+data_test = z500_mslp_arr[train_perc:]
+all_data = z500_mslp_arr
+print("   data train shape:", data_train.shape)
+print("   data test shape: ", data_test.shape)
+
+#%% INITIALIZE THE SOM
+# Now that you have the setup you can create your SOMs
+# 1985 - 2019
+# ARCIS, 2x2: sigma = 1, LR = 0.002
+# CERRA Land, 3x2: sigma = 1, LR = 0.005
+
+# 1984 - 2021
+# CERRA Land, 3x2: sigma = 0.95, LR = 0.0008
+
+# common for all of the SOMs
+perc_pca = 0.95
+
+pca = PCA(n_components= perc_pca) # Keeps 95% of the variance
+data_train_pca = pca.fit_transform(data_train)
+data_test_pca = pca.transform(data_test)
+all_data_pca = pca.transform(all_data)
+print(data_train_pca.shape)
+
+if start_year == 1985 and end_year== 2019 :
+    
+    if region_domain == "north":
+        
+        sigma = 1
+        learning_rate = 0.002
+        som_col = 2
+        som_row = 2
+        
+        if pr_dataset_str == "ARCIS" :
+            folderpath_SOMs = 'your_path/' # your path where you have saved the SOMs
+            master_som_name = "ARCIS_north_EU5_filter1000_Z500_mSLP_PCA_95_2by2_LR0.002_sig1_n_1"
+            wt_list = [[2, 1], [4, 3]] # ARCIS Central-North
+            
+            print("loading " + master_som_name)
+            
+        elif pr_dataset_str == "MSWEP" :
+            folderpath_SOMs = 'your_path/' # your path where you have saved the SOMs
+            master_som_name = "MSWEP_north_EU5_filter1000_Z500_mSLP_PCA_95_2by2_LR0.002_sig1_n_6"
+            wt_list = [[2, 4], [1, 3]] # MSWEP Central-North
+            print("loading " + master_som_name)
+            
+        elif pr_dataset_str == "CERRA_LAND" :
+            folderpath_SOMs = 'your_path/' # your path where you have saved the SOMs
+            master_som_name = "CERRA_LAND_north_EU5_filter1000_Z500_mSLP_PCA_95_2by2_LR0.002_sig1_n_4"
+            wt_list = [[3, 4], [1, 2]] # CERRA Central-North    
+            print("loading " + master_som_name)
+        
+    elif region_domain == "italy":
+        
+        sigma = 1
+        learning_rate = 0.005
+        som_col = 3
+        som_row = 2
+        
+        folderpath_SOMs = 'your_path/' # your path where you have saved the SOMs
+        master_som_name = "CERRA_LAND_italy_EU5_filter1000_Z500_mSLP_PCA_95_3by2_LR0.005_sig1_n_3"
+        wt_list = [[1, 3, 5], [2, 4, 6]] # CERRA Italy
+        print("loading " + master_som_name)
+        
+
+som_shape =(som_row, som_col)
+min_som = min(som_col, som_row)
+
+number_of_soms = 10
+q_win = 100000.
+q_error_list = []
+t_error_list = []
+       
+
+filepath_master_som = glob.glob(folderpath_SOMs + master_som_name + '*')[0]  #this is showing the path and the given file
+
+print(filepath_master_som)
+master_som = pickle.load(open(filepath_master_som, 'rb'))
+som_weights = master_som._weights
+print(som_weights.shape)
+
+# Reverse PCA to return to original features
+data_prototypes_pca_inverse = pca.inverse_transform(som_weights)
+
+# new dictionary for the new data
+keys = [i for i in product(range(som_row), range(som_col))]  ## DIM OF SOMS
+winmap = {key: [] for key in keys}
+
+data_chosen = all_data_pca
+test_train_all = "all"
+
+winner_coordinates = np.array([master_som.winner(x) for x in data_chosen]).T
+        
+# with np.ravel_multi_index we convert the bidimensional
+# coordinates to a monodimensional index
+cluster_index_list = []
+cluster_dates_list = []
+
+cluster_index = np.ravel_multi_index(winner_coordinates, som_shape)
+cluster_index_list += [cluster_index] 
+dim_som = som_col * som_row
+
+# to get the dates 
+cluster_nodes_dates = divide_dates_by_index(time_values, cluster_index, dim_som)
+
+#%%
+nx = int(len(lat))
+ny = int(len(lon))
+
+# just for graphic reason
+#wt_list = [[6, 3, 5], [2, 4, 1]] # CERRA Italy 1984 - 2021
+
+# Correlation 
+for i, x in enumerate(data_chosen):
+    winmap[master_som.winner(x)].append(i)
+    
+corr_list = []
+for k in range(som_weights.shape[0]):
+    for j in range(som_weights.shape[1]):
+        index_maps = winmap[(k,j)]
+        #print(index_maps) #index of the maps of a single node
+        cluster_maps = [data_chosen[i] for i in index_maps] # maps relative to such indices
+        
+        print("Node " + str(k*som_weights.shape[1] + j+1))
+        print(" number of maps: " + str((len(cluster_maps))))
+        corr_list_temp = []
+        for i in range(len(cluster_maps)):
+            corr_list_temp += [np.corrcoef(som_weights[k,j,:], cluster_maps[i])[0,1]]
+    
+        print(" corr.: " + str(np.mean(corr_list_temp))) 
+        corr_list += [np.mean(corr_list_temp)]
+
+        frequencies = master_som.activation_response(all_data_chosen)
+        freq_perc = frequencies / len(all_data_chosen) * 100   # percentual freq
+
+
+# node 
+fig, axs = plt.subplots(nrows=som_row,ncols=som_col, 
+                        subplot_kw={'projection': ccrs.PlateCarree()},
+                        figsize=(45, 15),facecolor='white') 
+fig.tight_layout()
+node = 0
+for i in range(som_row):
+    for j in range(som_col):
+        
+        frequencies = master_som.activation_response(data_chosen)
+        freq_perc = frequencies / len(data_chosen) * 100   # percentual freq
+        
+        data_prototypes_node = data_prototypes_pca_inverse[i][j].reshape(1,-1) # mappa singolo nodo
+                        
+        # divido in Z500 e mslp
+        SOM_array = data_prototypes_node.reshape(nx,ny,2)
+        SOM_z500_temp = SOM_array[:,:,0]
+        SOM_mslp_temp = SOM_array[:,:,1]
+        
+        SOM_z500_inverted = scaler_z500.inverse_transform(SOM_z500_temp.reshape(1,-1))
+        SOM_mslp_inverted = scaler_mslp.inverse_transform(SOM_mslp_temp.reshape(1,-1))
+        # ma devo fare l'inversione dello scaler
+        
+        SOM_z500 = SOM_z500_inverted.reshape(nx,ny)
+        SOM_mslp = SOM_mslp_inverted.reshape(nx,ny) 
+        
+        datacrs = ccrs.PlateCarree()        
+        #axs=axs.flatten()
+        levs = np.arange(-210, 211, 30)
+        cs2=axs[i][j].contourf(lon, lat, SOM_z500,
+                          transform = ccrs.PlateCarree(),
+                          cmap="RdBu_r", levels = levs,extend='both')
+        label_shaded = r"anom. $Z_{500}$ (m)"
+        
+        levels = np.arange(-20, 22, 2) # label height #mslp
+        #levels = np.arange(-100, 100, 10)
+        contour = axs[i][j].contour(lon, lat, SOM_mslp, levels, colors="red", transform = ccrs.PlateCarree(), linewidths=1)
+        plt.clabel(contour, inline=True, fontsize=14, fmt='%1.0f') 
+        
+        axs[i][j].set_extent([lon[0], lon[-1], lat[0], lat[-1]], ccrs.PlateCarree())
+        
+        axs[i][j].coastlines()
+        axs[i][j].add_feature(cfeature.BORDERS) 
+        axs[i][j].set_title("WT" + str(wt_list[i][j]) + ": F.=%.2f" % freq_perc[i,j] + "%, " + r"$\rho$=%.2f" % corr_list[node] , fontsize=28)
+        #axs[i][j].set_title("N" + str(node) + ": F.=%.2f" % freq_perc[i,j] + "%, " + r"$\rho$=%.2f" % corr_list[node] , fontsize=28)
+        
+        #axs[(k*4)+i].scatter(-156.36,71.19, c='yellow',marker= 'o',s=120, linewidth=2,edgecolors= "black" ,zorder= 4,transform=datacrs)
+        
+        
+        # Title each subplot 
+        #axs[0].set_title("F:" + str(int(frequencies[k,i])) + " (" + "%.2f" % freq_perc[k,i] + " %) " + r"$\rho$: %.2f" % corr_list[node] , fontsize=18)
+        node = node + 1 
+
+plt.tight_layout()
+fig.subplots_adjust(bottom=0.25, top=0.9, left=0.05, right=0.6,
+            wspace=0.05, hspace=0.25)
+
+cbar_ax = fig.add_axes([0.08, 0.2, 0.5, 0.02])
+#cbar=fig.colorbar(cs2,cax=cbar_ax, ticks = np.arange(lev_start, np.abs(lev_start)+lev_step, lev_step*2),orientation='horizontal')
+cbar=fig.colorbar(cs2,cax=cbar_ax, ticks = levs,orientation='horizontal')
+
+cbar.set_label(label_shaded, fontsize=26)
+cbar.ax.tick_params(labelsize=22)
+#cbar.set_label(r"anom. TCWV ($kg / m^2$)", fontsize=22)
+
+#plt.suptitle('SOM Nodes (anom. all data): ' + som_variables_str + ". " + pr_dataset_str + " " + region_domain + " " + str(som_col) + "by" + str(som_row) + " n." + name_best[-2:], x= 0.33 ,fontsize=26)   
+plt.savefig(folderpath_SOMs + pr_dataset_str + '_all_anomalyplot_' +master_som_name+'.svg', bbox_inches='tight')
+plt.savefig(folderpath_SOMs + pr_dataset_str + '_all_anomalyplot_' +master_som_name+'.png', bbox_inches='tight')
+plt.show()
