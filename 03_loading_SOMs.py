@@ -214,19 +214,15 @@ if start_year == 1985 and end_year== 2019 :
             master_som_name = "ARCIS_north_EU5_filter1000_Z500_mSLP_PCA_95_2by2_LR0.002_sig1_n_1"
             wt_list = [[2, 1], [4, 3]] # ARCIS Central-North
             
-            print("loading " + master_som_name)
-            
         elif pr_dataset_str == "MSWEP" :
             folderpath_SOMs = 'your_path/' # your path where you have saved the SOMs
             master_som_name = "MSWEP_north_EU5_filter1000_Z500_mSLP_PCA_95_2by2_LR0.002_sig1_n_6"
             wt_list = [[2, 4], [1, 3]] # MSWEP Central-North
-            print("loading " + master_som_name)
             
         elif pr_dataset_str == "CERRA_LAND" :
             folderpath_SOMs = 'your_path/' # your path where you have saved the SOMs
             master_som_name = "CERRA_LAND_north_EU5_filter1000_Z500_mSLP_PCA_95_2by2_LR0.002_sig1_n_4"
             wt_list = [[3, 4], [1, 2]] # CERRA Central-North    
-            print("loading " + master_som_name)
         
     elif region_domain == "italy":
         
@@ -238,8 +234,8 @@ if start_year == 1985 and end_year== 2019 :
         folderpath_SOMs = 'your_path/' # your path where you have saved the SOMs
         master_som_name = "CERRA_LAND_italy_EU5_filter1000_Z500_mSLP_PCA_95_3by2_LR0.005_sig1_n_3"
         wt_list = [[1, 3, 5], [2, 4, 6]] # CERRA Italy
-        print("loading " + master_som_name)
-        
+
+print("loading " + master_som_name)
 
 som_shape =(som_row, som_col)
 min_som = min(som_col, som_row)
