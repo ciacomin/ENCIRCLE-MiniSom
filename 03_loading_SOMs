@@ -373,3 +373,165 @@ cbar.ax.tick_params(labelsize=22)
 plt.savefig(folderpath_SOMs + pr_dataset_str + '_all_anomalyplot_' +master_som_name+'.svg', bbox_inches='tight')
 plt.savefig(folderpath_SOMs + pr_dataset_str + '_all_anomalyplot_' +master_som_name+'.png', bbox_inches='tight')
 plt.show()
+
+#%% Trend
+# Annual time series - Complete with 0
+years = range(start_year,end_year+1)
+reference_df = pd.DataFrame([year for year in years],  # reference df 
+                         columns=['year'])
+
+fig, axs = plt.subplots(nrows=som_row, ncols=som_col,
+                        figsize=(24, 10),facecolor='white', dpi=200) 
+
+node = 0
+for i in range(som_row):
+    for j in range(som_col):
+        index_color = node + node*1
+        index_color_trend = index_color+1
+        date_list = cluster_nodes_dates[node]
+        
+        df = pd.DataFrame({'date': date_list})  # dataframe with pandas
+        df['year'] = df['date'].dt.year         # extract the year 
+        
+        annual_counts = df.groupby('year').size() # counts
+        
+        annual_counts_df = annual_counts.reset_index(name='counts')           # turn into df
+        
+        annual_counts_df_complete= reference_df.merge(annual_counts_df, on=['year'], how='left')
+        annual_counts_df_complete['counts'] = annual_counts_df_complete['counts'].fillna(0).astype(int)  # fill the gap years 
+        
+        years_index = annual_counts_df_complete['year']
+        years_counts= annual_counts_df_complete['counts']
+        
+        m, q, y_fit = linear_trend(years_index - years_index[0], years_counts)
+        print("m:", m, "; ", "q:" , q)
+        trend, _, p, _, _, _, _, _, _ =  mk.original_test(years_counts)
+        print(node+1)
+        print(mk.original_test(years_counts))
+        
+        #axs[i, j].plot(annual_counts.index, annual_counts.values, marker='o', linestyle='-',  linewidth=1)
+        #axs[i, j].plot(annual_counts.index, y_fit, label=f'Trend Lineare (y = {m:.2f}x + {q:.2f})', linewidth=2)
+        
+        axs[i, j].plot(years_index, years_counts, marker='o', linestyle='-', color=colors_trend[index_color], linewidth=1)
+        #axs[i, j].plot(years_index, y_fit, label=f'y = {m:.2f}x + {q:.2f}, p:{p:.2f} ', color=colors_trend[index_color_trend], linewidth=2)
+        axs[i, j].plot(years_index, y_fit, label=f'y = {m:.2f}x, p:{p:.2f} ', color=colors_trend[index_color_trend], linewidth=2)
+        axs[i, j].set_title(f"WT {wt_list[i][j]}", fontsize=26)
+        #axs[i, j].set_title(f"N {node}", fontsize=24)
+        axs[i, j].set_xlabel('Year', fontsize=21)
+        axs[i, j].set_ylabel('Annual frequency', fontsize=21)
+        axs[i, j].set_ylim([0,17])
+        axs[i, j].grid()
+        axs[i, j].tick_params(labelsize=18)
+        axs[i, j].legend(fontsize=16)
+        node = node + 1
+        
+fig.tight_layout()
+#plt.savefig(folderpath_SOMs + pr_dataset_str + '_annual_trends_' +master_som_name+'.svg', bbox_inches='tight')
+#plt.savefig(folderpath_SOMs + pr_dataset_str + '_annual_trends_' +master_som_name+'.png', bbox_inches='tight')
+plt.show()
+
+seasons = ["DJF", "MAM", "JJA", "SON"]
+reference_df = pd.DataFrame([(year, season) for year in years for season in seasons],  # reference df 
+                         columns=['year', 'season'])
+
+
+# =============================================================================
+# fig, axs = plt.subplots(nrows=som_row,ncols=som_col,
+#                         figsize=(24, 10),facecolor='white') 
+# 
+# node = 0
+# for i in range(som_row):
+#     for j in range(som_col):
+#         date_list = cluster_nodes_dates[node]
+#         df = pd.DataFrame({'date': date_list})
+#         
+#         count_per_season = df.groupby([df['date'].dt.year.rename('year'), 
+#                            df['date'].apply(get_season).rename('season')]).size()   # season e anno
+# 
+#         count_per_season_df = count_per_season.reset_index(name='counts')           # turn into df
+#         
+#         count_per_season_df_complete = reference_df.merge(count_per_season_df, on=['year', 'season'], how='left')
+#         count_per_season_df_complete['counts'] = count_per_season_df_complete['counts'].fillna(0).astype(int)  # fill the gap years 
+#         
+#         for k, season in enumerate(seasons):
+#             index_color = k + k*1
+#             index_color_trend = index_color+1
+#             
+#             print(k, season)
+#             season_data = count_per_season_df_complete[count_per_season_df_complete['season'] == season]
+#             
+#             seas_year   = season_data['year']
+#             seas_counts = season_data['counts']
+#             
+#             m, q, y_fit = linear_trend(seas_year, seas_counts)
+#             trend, _, p, _, _, _, _, _, _ = mk.original_test(seas_counts.values)
+#             print(node+1)
+#             print(mk.original_test(seas_counts.values))
+#             # Plot
+#             axs[i, j].plot(seas_year, seas_counts, marker='o', linestyle='-', color=seasonal_colors[index_color], label=season, alpha=0.8, linewidth=1)
+#             axs[i, j].plot(seas_year, y_fit, label=f'y = {m:.2f}x + {q:.2f}, {trend} p:{p:.2f}', color=seasonal_colors[index_color_trend], linewidth=2)
+#             
+#         axs[i, j].set_title("WT" + str(wt_list[i][j]), fontsize=24)
+#         axs[i, j].set_xlabel('Year', fontsize=20)
+#         axs[i, j].set_ylabel('Counts', fontsize=20)
+#         axs[i, j].grid()
+#         axs[i, j].tick_params(labelsize=16)
+#         axs[i, j].legend()
+#         
+#         node = node +1
+#         
+# fig.tight_layout()
+# plt.show()
+# 
+# =============================================================================
+# CERRA only stat. significant WT3 node=1
+
+fig, axs = plt.subplots(nrows=1,ncols=1,
+                        figsize=(12, 6),facecolor='white', dpi=200) 
+
+node = 1
+date_list = cluster_nodes_dates[node]
+df = pd.DataFrame({'date': date_list})
+
+count_per_season = df.groupby([df['date'].dt.year.rename('year'), 
+                   df['date'].apply(get_season).rename('season')]).size()   # season e anno
+
+count_per_season_df = count_per_season.reset_index(name='counts')           # turn into df
+
+count_per_season_df_complete = reference_df.merge(count_per_season_df, on=['year', 'season'], how='left')
+count_per_season_df_complete['counts'] = count_per_season_df_complete['counts'].fillna(0).astype(int)  # fill the gap years 
+
+for k, season in enumerate(seasons):
+    index_color = k + k*1
+    index_color_trend = index_color+1
+    
+    print(k, season)
+    season_data = count_per_season_df_complete[count_per_season_df_complete['season'] == season]
+    
+    seas_year   = season_data['year']
+    seas_counts = season_data['counts']
+    
+    m, q, y_fit = linear_trend(seas_year, seas_counts)
+    trend, _, p, _, _, _, _, _, _ = mk.original_test(seas_counts.values)
+    print(p)
+    if p < 0.10:
+        axs.plot(seas_year, seas_counts, marker='o', linestyle='-', color=seasonal_colors[index_color], label=season, linewidth=2)
+        axs.plot(seas_year, y_fit, label=f'y = {m:.2f}x, {trend} p:{p:.2f}', color=seasonal_colors[index_color_trend], linewidth=2)
+    else :
+        axs.plot(seas_year, seas_counts, marker='o', linestyle='-', color=seasonal_colors[index_color], label=season, linewidth=1)
+        axs.plot(seas_year, y_fit, label=f'y = {m:.2f}x, {trend} p:{p:.2f}', linestyle='--', color=seasonal_colors[index_color_trend], linewidth=2)
+    print(mk.original_test(seas_counts.values))
+    # Plot
+
+    
+axs.set_title("WT3", fontsize=24)
+axs.set_xlabel('Year', fontsize=20)
+axs.set_ylabel('Annual frequence', fontsize=20)
+axs.grid()
+axs.tick_params(labelsize=16)
+axs.legend(loc='center left', bbox_to_anchor=(1, 0.5), prop={'size': 13})
+
+fig.tight_layout()
+#plt.savefig(folderpath + pr_dataset_str + '_WT3_annual_trends_' +master_som_name+'.svg', bbox_inches='tight')
+#plt.savefig(folderpath + pr_dataset_str + '_WT3_annual_trends_' +master_som_name+'.png', bbox_inches='tight')
+plt.show()
