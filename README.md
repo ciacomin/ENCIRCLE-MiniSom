@@ -8,7 +8,8 @@ We acknowledge the Italian Department of Civil Protection for providing the shap
 
 We thank and acknowledge the tutorial of Kurtz and Martin (2023) (https://github.com/taliakurtz/MiniSOM_tutorial) on the Python package MiniSom as a starting point for our coding.
 
-
+We acknowledge the use of the pyMannKendall package (https://doi.org/10.21105/joss.01556) for the trend analysis. 
+ 
 ## LICENSE
 This is covered under a BSD 3-Clause License. 
 
