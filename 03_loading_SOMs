@@ -62,6 +62,14 @@ folderpath_SOMs = 'output_SOM/SOMs/'
 
 # datasets
 data_path_ERA5 = "data/ERA5/" 
+path_ARCIS = "data/ArCIS"            
+path_MSWEP = "data/MSWEP" 
+path_CERRA = "path/CERRA_Land"   
+path_CERRA_wa = "path/CERRA_Land_warning_region_mean" 
+
+# shape_files
+shapef_path= "data/shape_files/"  + 'ZA_2017_ID_v4_geowgs84.shp'
+shape_gdf = gpd.read_file(shapef_path)
 ################################################################
 
 ## MY FINAL CONFIGURATION
