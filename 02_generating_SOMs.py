@@ -1,5 +1,7 @@
 """
 @author: ciacomin
+
+# This file manages the generation of the SOMs
 """
 
 import os
