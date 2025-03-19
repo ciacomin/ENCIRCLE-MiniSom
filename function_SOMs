@@ -1,0 +1,243 @@
+"""
+@author: ciacomin
+"""
+
+import numpy as np
+import pandas as pd
+#import glob
+import xarray as xr
+#from xarray import DataArray
+
+### Figures : maps and altitude maps
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import matplotlib.cm as cm
+import matplotlib.colors as colors
+from matplotlib.colors import ListedColormap,LinearSegmentedColormap
+
+# pip install mpl-scatter-density
+#import mpl_scatter_density # adds projection='scatter_density'
+
+# Map figure
+import warnings; warnings.filterwarnings("ignore")
+import cartopy.crs as ccrs
+
+crs = ccrs.PlateCarree()
+
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+#import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+#import proplot
+from matplotlib import ticker
+
+
+# Statistics
+from scipy import stats
+
+from scipy.constants import g
+
+
+#%% COLORMAPS
+# Prob. colormap 
+# "% of extreme events belonging to each WT"
+colormap17_pr = [
+    "#d9ecff", "#c0dbfa",
+    "#9ccaf7", "#69b3f0",
+    #"#50a7e6","#3994cc",
+    "#2481b3", "#1c7199",
+    "#0f6080", "#08515e",
+    "#045c5c", "#016754",
+    "#0b8054", "#1e9253",
+    "#52b041", "#6dbd37",  
+    "#87ca2d", "#c6e616", "#feff00"
+    ]
+
+prob_colormap = mpl.colors.ListedColormap(colormap17_pr)
+
+
+# TRENDS
+colors_trend =     [
+    "#2476b5", #bright
+    "#0c4b78", # dark
+    
+    "#008c69",
+    "#005259",
+    
+ # dark
+    "#00cc44",
+    "#01802b",
+
+    #"#ffd400", 
+    "#ffaa00",
+    "#ff7f00",
+        
+    "#eb1cb7",
+    #"#be21cc",
+    "#8613bf",
+        
+    "#6419a6",    #modified
+    #"#450a80",
+    "#330066"]
+
+trend_colormap = mpl.colors.ListedColormap(colors_trend)
+
+seasonal_colors = [
+    # Winter (DJF) - light to dark blue
+     "#6497b1", "#005b96",
+    # Spring (MAM) - light pink to magenta
+    "#fbb4b9", "#f768a1", #"#ae017e",
+    # Summer (JJA)- shades of green
+    #"#a1d99b", 
+    "#41ab5d", "#006d2c",
+    # Autumn (SON) - light to dark orange
+    #"#fdbe85", 
+    "#fd8d3c", "#e6550d",
+    
+    #"#b3cde3"
+]
+
+seasonal_color_trend = mpl.colors.ListedColormap(seasonal_colors)
+
+
+
+
+#%% OPEN DATA
+
+
+
+#%% DATAFRAME MANIPULATIONS
+def dataframe_cut_xlsx(path_xlsx_file, first_year, last_year, exclude_last_row=False):
+    # function to cut a selected dataset from a bigger one
+    # check 
+    # - first column is the column of times
+    # - the format of the dates
+    data_raw= pd.read_excel(path_xlsx_file)
+    data_tmp = data_raw
+    
+    if exclude_last_row == True:
+        data_tmp = data_raw.iloc[:-1]
+        
+    label_first_column = data_tmp.columns[0] #get the label of the first column
+
+    data = data_tmp.rename(columns={ label_first_column : "Time"}) #change the label
+    
+    data['Time'] = pd.to_datetime(data['Time'])
+    #data['Time'] = data['Time'].apply(pd.to_datetime)
+    # do the time mask
+    time_mask = (data['Time'].dt.year >= first_year) & \
+                (data['Time'].dt.year <= last_year)
+    # select the data
+    data[time_mask]
+    choseInd = [ind for ind in data[time_mask].index]
+    
+    df_select = data.loc[choseInd]
+    
+    return data_raw, df_select
+
+def dataframe_cut_xlsx_sheet(path_xlsx_file, sheet_name, first_year, last_year, exclude_last_row=False):
+    # same as dataframe_cut_xlsx but for a specific sheet
+    
+    data_raw= pd.read_excel(path_xlsx_file, sheet_name=sheet_name)
+    data_tmp = data_raw
+    
+    if exclude_last_row == True:
+        data_tmp = data_raw.iloc[:-1]
+        
+    label_first_column = data_tmp.columns[0] #get the label of the first column
+
+    data = data_tmp.rename(columns={ label_first_column : "Time"}) #change the label
+    
+    data['Time'] = pd.to_datetime(data['Time'])
+    #data['Time'] = data['Time'].apply(pd.to_datetime)
+    # do the time mask
+    time_mask = (data['Time'].dt.year >= first_year) & \
+                (data['Time'].dt.year <= last_year)
+    # select the data
+    data[time_mask]
+    choseInd = [ind for ind in data[time_mask].index]
+    
+    df_select = data.loc[choseInd]
+    
+    return data_raw, df_select
+
+def dataframe_cut(path_csv_file, first_year, last_year):
+    # same as dataframe_cut_xlsx but for a csv file
+    
+    data_raw= pd.read_csv(path_csv_file)
+    label_first_column = data_raw.columns[0] #get the label of the first column
+
+    data = data_raw.rename(columns={ label_first_column : "Time"}) #change the label
+    
+    data['Time'] = pd.to_datetime(data['Time'])
+    #data['Time'] = data['Time'].apply(pd.to_datetime)
+    # do the time mask
+    time_mask = (data['Time'].dt.year >= first_year) & \
+                (data['Time'].dt.year <= last_year)
+    # select the data
+    data[time_mask]
+    choseInd = [ind for ind in data[time_mask].index]
+    
+    df_select = data.loc[choseInd]
+    
+    return data_raw, df_select
+
+
+def dataframe_extremes_xlsx(pd_dataframe, label_col_extreme):
+    # select the entries for whom "label_col_extreme" is True
+    
+    df = pd_dataframe
+    #label_first_column = df.columns[-2]
+    df_select = df.loc[df[label_col_extreme] == True]
+    return df_select
+
+def add_pr_max_column(dataset, idx_first_c, idx_last_c):
+    idx_stop = idx_last_c + 1
+    df_cutted = dataset.iloc[:, idx_first_c: idx_stop]
+    pr_max_c = df_cutted.max(axis=1)
+    dataset["PrMax"]=pr_max_c
+    #new_df = dataset.insert[1, "Pr Max", pr_max_c]
+    
+    return dataset
+
+# COMPOSITES
+def divide_dates_by_index(list_of_dates, list_of_indices, number_indices):
+    # Initialize a list of empty lists
+    divided_dates = [[] for _ in range(number_indices)]
+    
+    # Iterate through dates and indices
+    for date, index in zip(list_of_dates, list_of_indices):
+        # Add the date to the list corresponding to the index
+        divided_dates[index].append(date)
+    
+    return divided_dates
+
+#%% TREND
+def linear_trend(x, y):
+    """
+    Computes the linear trend of the given data.
+    
+    Parameters:
+    - x: array-like, independent variable (e.g., year)
+    - y: array-like, dependent variable (e.g., count)
+    
+    Returns:
+    - m: slope of the line
+    - q: intercept
+    - y_fit: estimated values for the linear trend
+    """
+    m, q = np.polyfit(x, y, 1)
+    y_fit = m * x + q  
+    return m, q, y_fit
+
+def get_season(date):
+    month = date.month
+    if month in [12, 1, 2]:
+        return 'DJF'
+    elif month in [3, 4, 5]:
+        return 'MAM'
+    elif month in [6, 7, 8]:
+        return 'JJA'
+    else:
+        return 'SON'
