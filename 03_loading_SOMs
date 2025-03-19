@@ -805,3 +805,118 @@ print(ny)
             
 maps_prob_perc = [None for _ in range(len(cluster_nodes_dates)) ]
 
+list_map_greater_temp = []
+for j in range(len(cluster_nodes_dates)): # iterates over all nodes 
+    list_map_temp = []
+    print("node", j+1)
+    for k in range(len(cluster_nodes_dates[j])): # Iterates over all maps within each node
+        
+
+        indx = np.where(pr_time[:].astype('datetime64[D]')==cluster_nodes_dates[j][k].astype('datetime64[D]'))[0]
+        #indx = np.where(time_values[:]==cluster_dates_list[i][j][k], "nearest")[0][0]
+        #print(cluster_dates_list[0][0][k])
+        #print(time_values[indx])
+        #print("")
+        list_map_temp += [pr[indx]] 
+        #print(pr_time[indx])
+        #print(cluster_nodes_dates[j][k])
+        
+    maps_array = np.array(list_map_temp) # all the maps that are associated with a node
+    #print(maps_array.shape)
+    
+    if maps_array.shape == (0,) :    
+        # sometimes you do not have maps that satisfy the condition, so you have 0 maps
+        # in this case I put the map as 0
+        print("no maps")
+        prob_map = [ [0 for i in range(len(pr[0][0])) ] for j in range(len(pr[0]))]
+        
+    else:
+                      
+        maps_array = maps_array[:,0,:,:]
+        #print(maps_array.shape)
+        #print(pr_99.shape) # check if they  have the same dimension
+
+        list_map_greater = np.sum(maps_array >= pr_99, axis=0)  # del singolo nodo
+        list_map_greater_temp += [list_map_greater] #
+            # somma tutte le volte che è soddisfatta la condizione maps_array >= pr_99 per ogni singola mappa presente in quel nodo
+  
+        #print(list_map_greater.shape)
+        prob_map = list_map_greater / maps_array.shape[0] # divido per il numero di giorni presenti nella mappa
+        print("number of maps", maps_array.shape[0])
+        #maps_composite[i][j] = list_map_mean[0,:,:]
+        #print(prob_map.shape)
+ 
+    maps_prob_perc[j]=prob_map # reshape
+
+list_map_greater_total = np.sum(list_map_greater_temp, axis=0)
+
+maps_prob_perc_2 = [None for _ in range(len(cluster_nodes_dates)) ]
+
+for j in range(len(cluster_nodes_dates)): # iterates over all nodes 
+    
+    #print(list_map_greater.shape)
+    prob_map = list_map_greater_temp[j] / list_map_greater_total # divido per il numero di giorni presenti nella mappa
+    #maps_composite[i][j] = list_map_mean[0,:,:]
+    #print(prob_map.shape)
+ 
+    maps_prob_perc_2[j]=prob_map # reshape
+
+all_data_prob_maps = maps_prob_perc_2
+
+datacrs = ccrs.PlateCarree()
+
+#You will set this to the dimensions of the SOM.  ## DIM OF SOMS
+fig, axs = plt.subplots(nrows=som_row,ncols=som_col, 
+                        subplot_kw={'projection': ccrs.PlateCarree()},
+                        #figsize=(30, 20),facecolor='white') #Italy NI 3X3
+                        figsize=(38,20),facecolor='white') #EU AND NI 2X3
+axs=axs.flatten()
+for k in range(len(maps_prob_perc)):
+    # to check
+    #lev_start = SOM_mslp.min()
+    #print(lev_start)             
+    #lev_stop = SOM_mslp.max()
+    #print(lev_stop)
+    
+    levs = np.arange(0, 69, 4) 
+    #levs = np.arange(0, 18, 1) 
+    n_cmap = len(levs)
+    norm = mpl.colors.BoundaryNorm(levs, n_cmap)
+    cmap = plt.cm.get_cmap(prob_colormap, n_cmap)
+    #cs2=axs[k].contourf(pr_lon, pr_lat, all_data_prob_maps[k]*100*pr_mask,
+    cs2=axs[k].contourf(pr_lon, pr_lat, all_data_prob_maps[k]*100,
+                      n_cmap, cmap=cmap, norm=norm, levels=levs, transform = ccrs.PlateCarree(), extend='both')               
+        
+    
+    axs[k].set_extent([5, 19, 48, 36], ccrs.PlateCarree()) # all Italy
+    domain = "IT"
+    #axs[k].set_extent([6.5, 14.2, 47.5, 41.9], ccrs.PlateCarree()) # ARCIS domain
+    #domain = "NI"
+    
+    
+    axs[k].coastlines()
+    axs[k].add_feature(cfeature.BORDERS) 
+    #axs[(k*4)+i].scatter(-156.36,71.19, c='yellow',marker= 'o',s=120, linewidth=2,edgecolors= "black" ,zorder= 4,transform=datacrs)
+    
+    
+    # Title each subplot 
+    #axs[k].set_title('Node:'+str(k+1) + " Freq:" + str(frequencies[k,i]), fontsize=18)
+    axs[k].set_title('WT'+str(flat_wt_list[k]), fontsize=28)
+    
+    plt.tight_layout()
+    fig.subplots_adjust(bottom=0.25, top=0.9, left=0.05, right=0.6,
+                wspace=0.05, hspace=0.25)
+        
+cbar_ax = fig.add_axes([0.08, 0.2, 0.5, 0.02])
+#cbar=fig.colorbar(cs2,cax=cbar_ax, ticks = np.arange(lev_start, np.abs(lev_start)+lev_step, lev_step*2),orientation='horizontal')
+#cbar=fig.colorbar(cs2,cax=cbar_ax, ticks = levs,orientation='horizontal')
+cbar = mpl.colorbar.ColorbarBase(cbar_ax, cmap=cmap, norm=norm, ticks=levs,
+                             spacing='uniform', format='%1i',  orientation='horizontal')
+cbar.ax.tick_params(labelsize=22)
+cbar.set_label("% of extreme events belonging to each WT", fontsize=26)
+
+#plt.suptitle('Probability above 99th per. (' + pr_dataset_str + ") " + region_domain + " " + str(som_col) + "by" + str(som_row) + " n." + master_som_name[-2:], x= 0.33 ,fontsize=26)   
+#plt.savefig(folderpath + master_som_name + '_' + 'Prob_maps_'  + test_or_all + '_wet.png', bbox_inches='tight')
+#plt.savefig(folderpath + master_som_name + '_' + 'Prob_maps_'  +test_or_all + '_wet.svg', bbox_inches='tight')
+plt.show()
+
