@@ -304,8 +304,8 @@ for k in range(som_weights.shape[0]):
         print(" corr.: " + str(np.mean(corr_list_temp))) 
         corr_list += [np.mean(corr_list_temp)]
 
-        frequencies = master_som.activation_response(all_data_chosen)
-        freq_perc = frequencies / len(all_data_chosen) * 100   # percentual freq
+        frequencies = master_som.activation_response(data_chosen)
+        freq_perc = frequencies / len(data_chosen) * 100   # percentual freq
 
 
 # node 
