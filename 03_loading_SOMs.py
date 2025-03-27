@@ -86,6 +86,15 @@ shape_gdf = gpd.read_file(shapef_path)
 dataset = Dataset.CERRA_LAND.value                      # chose the desired dataset
 pr_dataset_str = DatasetString.CERRA_LAND.value         # same as before 
 region_domain = RegionDomain.ITALY.value                # chose the desired region domain
+
+n_WA = 0
+if region_domain == "north":
+    n_WA = 94
+elif region_domain == "italy":
+    n_WA = 156
+else :
+    print("please check your region_domain")
+    
 # Chose the domain for the SOM
 SOM_domain = "EU5" #SOM domain
 
