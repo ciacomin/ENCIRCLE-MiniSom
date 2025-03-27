@@ -246,7 +246,8 @@ t_error_list_test = []
 
 data_train_chosen = data_train_pca
 data_test_chosen = data_test_pca
-all_data_chosen = all_data_pca
+#all_data_chosen = all_data_pca
+
 for path, name in zip(filepaths, names):
     with open (path, 'rb') as f:
         file = pickle.load(f) #This is loading every single som in that location
@@ -350,7 +351,7 @@ for k in range(weights.shape[0]):
         print(" corr.: " + str(np.mean(corr_list_temp))) 
         corr_list += [np.mean(corr_list_temp)]
 
-        frequencies = som.activation_response(all_data_chosen)
-        freq_perc = frequencies / len(all_data_chosen) * 100   # percentual freq
+        frequencies = som.activation_response(data_chosen)
+        freq_perc = frequencies / len(data_chosen) * 100   # percentual freq
 
 
