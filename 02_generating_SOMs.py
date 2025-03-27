@@ -79,6 +79,7 @@ data_path_ERA5 = "data/ERA5/"
 dataset = Dataset.CERRA_LAND.value                      # chose the desired dataset
 pr_dataset_str = DatasetString.CERRA_LAND.value         # same as before 
 region_domain = RegionDomain.ITALY.value                # chose the desired region domain
+    
 # Chose the domain for the SOM
 SOM_domain = "EU5" #SOM domain
 
