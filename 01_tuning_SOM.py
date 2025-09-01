@@ -13,11 +13,11 @@ import glob
 from enum import Enum
 import xarray as xr
 import winsound
-#from xarray import DataArray
 
 os.chdir('C:\\your_directory') # if you need to change to your directory 
 
-from functions_new_version import *
+#from functions_new_version import *
+from function_SOMs import *
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from itertools import product
@@ -25,10 +25,14 @@ from itertools import product
 #import for the SOM
 import minisom
 from minisom import asymptotic_decay
+import datetime
 from datetime import date
 import pickle
 
 from sklearn.metrics import silhouette_score
+
+import pymannkendall as mk
+from scipy.stats import linregress
 
 class RegionDomain(Enum):
     NORTH_ITALY = "north"
@@ -36,11 +40,13 @@ class RegionDomain(Enum):
     
 class Dataset(Enum):
     CERRA_LAND = "cerra-land6"
+    CERRA = "cerra6"
     ARCIS = "arcis3"
     MSWEP = "mswep"
     
 class DatasetString(Enum):
     CERRA_LAND = "CERRA_LAND"
+    CERRA = "CERRA"
     ARCIS = "ARCIS"
     MSWEP = "MSWEP"
     
@@ -60,22 +66,41 @@ data_path_ERA5 = "data/ERA5/"
 ################################################################
 #%% 0) Dataset and variable selection 
 # Chose first which dataset and domain region
-dataset = Dataset.CERRA_LAND.value                      # chose the desired dataset
-pr_dataset_str = DatasetString.CERRA_LAND.value         # same as before 
-region_domain = RegionDomain.ITALY.value                # chose the desired region domain
+dataset_extreme = Dataset.CERRA.value                      # chose the desired dataset
+pr_dataset_str = DatasetString.CERRA.value                 # same as before 
+region_domain = RegionDomain.ITALY.value                   # chose the desired region domain
 # Chose the domain for the SOM
-SOM_domain = "EU5" #SOM domain
+SOM_domain = "EU5"                                         # chose the desired SOM domain
 
-start_year = 1985
-end_year = 2019 
+start_month = 11
+start_year = 1984
+start_month_str = "Nov"
+
+end_month = 10
+end_year = 2024
+end_month_str = "Oct"
+
+start_date = datetime.date(start_year, start_month, 1)
+end_date = datetime.date(end_year, end_month, 31) 
+
+print("from ", start_date, " to ", end_date)
+
+n_WA = 0
+if region_domain == "north":
+    n_WA = 94
+elif region_domain == "italy":
+    n_WA = 156
+else :
+    print("please check your region_domain")
 
 #%% 1) Compute the extreme_pr_days_list
-pr_days_dataset_filepath = glob.glob(path_extremes + dataset + "*" + region_domain + "*" + "withArea.xlsx" )[0]
+pr_days_dataset_filepath = glob.glob(path_extremes + dataset_extreme + "*" + region_domain + "*" + "withArea.xlsx" )[0]
+print(pr_days_dataset_filepath)
 
 print("1) DATASET AND DOMAIN REGION SELECTION ")
-print("   I am computing the extremes for " + dataset + " from " + str(start_year) + " to " + str(end_year))
+print("   I am computing the extremes for " + dataset_extreme + " from " + start_month_str + " " + str(start_year) + " to " + end_month_str + " " + str(end_year))
 # here you can select the time period you are interested into
-raw_pr_days_df, cut_pr_days_df = dataframe_cut_xlsx(pr_days_dataset_filepath, start_year, end_year, True)      # we want 1985 - 2019 period
+raw_pr_days_df, cut_pr_days_df = dataframe_cut_xlsx_month(pr_days_dataset_filepath, start_year, end_year, start_month, end_month, True)  
 # here you can select a spatial filter 
 extreme_pr_days_df = dataframe_extremes_xlsx(cut_pr_days_df, "intense rain day (1000km2)")           #here you can change the filter
 
@@ -85,115 +110,178 @@ extreme_pr_days_list = extreme_pr_days.tolist()       # List object
 print("   number of extremes: ", str(len(extreme_pr_days_list)))
 
 # if you want to save them 
-#print("I am saving "+ pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy')
-#np.save(output_path + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy', np.array(extreme_pr_days_list, dtype=object), allow_pickle=True)
-
+print("I am saving "+ pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_month) + "-" + str(start_year) + "_" + str(end_month) + "-" + str(end_year) + '.npy')
+np.save(output_path + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_month) + "-" + str(start_year) + "_" + str(end_month) + "-" + str(end_year) + '.npy', np.array(extreme_pr_days_list, dtype=object), allow_pickle=True)
 
 #%% 1.1) if you want directly to load the extremes uncomment
 # If you have a list of extreme days you can select them directly 
 # If you are on Spyder, comment with Ctrl + 4 and uncomment with Ctrl + 5
 
 # =============================================================================
-# print("I'm loading the extremes of " + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy')
-# extreme_pr_days_list = np.load(output_path + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_year) + "_" + str(end_year) + '.npy', allow_pickle=True)
+# print("I'm loading the extremes of " + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_month) + "-" + str(start_year) + "_" + str(end_month) + "-" + str(end_year) + '.npy')
+# extreme_pr_days_list = np.load(output_path + pr_dataset_str + '_extreme_dates_' + region_domain + "_" + str(start_month) + "-" + str(start_year) + "_" + str(end_month) + "-" + str(end_year) + '.npy', allow_pickle=True)
 # print(extreme_pr_days_list.shape)
 # =============================================================================
 
-#%% 2) Preparing the SOM - Z500 and mSLP
+#%%
+######################################################
+################ LOADING THE DATA ####################
+######################################################
 
-# Here you choose the domain for the SOM and preparing the files you need
-# 2a) load the variable of interest and do the standardization (per each variable)
-# 2b) start the pre-processing with the data train - test split
-# 2c) PCA
+# Here you 
+# 2a) load Z500, detrend it and apply latitude weights
+# 2b) load mSLP and apply latitude weights
 
-print("2) PREPARING THE DATA FOR THE SOM ")
 print("   SOM domain: "+ SOM_domain)
-#dataset_str = extreme_list_str # CHANGE THIS TO pr_dataset_str
 
 # 2a) load the variable of interest
 print(" -Loading the variables-")
 print("   Loading Z500...")
+name_file_z500 = "ERA5_daily_mean_Geop_500hPa_1984_2024_EU3_anomalies_clim1985_2019.nc"           # Anomalies of Z500
+dy_z500 = xr.open_mfdataset(data_path_ERA5 + name_file_z500, preprocess=select_latlon)   # Here you select the domain
 
-name_file_z500 = "ERA5_daily_mean_Geop_500hPa_" + str(start_year) + "_" + str(end_year) + "_EU3_anomalies.nc"           # Anomalies of Z500
-dy = xr.open_mfdataset(data_path_ERA5 + name_file_z500, preprocess=select_latlon)   # Here you select the domain
-ds = dy.sel(time=extreme_pr_days_list, method="nearest")                            # Here you select the extreme days
-#print(ds)
+### Detrending Z500
+time_values = dy_z500['time'].values
+z_values = dy_z500['Z'].values[:,0,:,:] / g 
+nday, nlat, nlon = z_values.shape
+lon = dy_z500['lon'].values  #they are the same for the two variables 
+lat = dy_z500['lat'].values
+
+### Latitude Weights
+# weigths associated with latitudes, np.cos wants radiants
+# so first you need to convert them in radiants
+lat_rad = np.radians(lat)
+cos_lat = np.cos(lat_rad)
+sum_cos_lat = np.sum(cos_lat)
+weights_lat = np.sqrt(cos_lat / sum_cos_lat)  
+#weights_lat = np.ones(101)
+print(weights_lat.shape)
+
+weights_lat_trend = cos_lat / sum_cos_lat
+
+weights_matrix_trend = np.tile(weights_lat_trend[:, np.newaxis], (1, 193))
+#diff = weights_matrix[:,10] - weights_lat #should be all 0s
+
+z_values_trend = np.multiply(z_values, weights_matrix_trend)
+
+# Reshape and detrend
+z500_2d = z_values_trend.reshape(nday, -1)
+z500_mean_values = np.mean(z500_2d, axis=1)
+
+z500_slope, z500_intercept, _, _, _ = linregress(np.arange(nday), z500_mean_values)
+z500_trend = z500_slope * np.arange(nday) + z500_intercept
+z_values_detrended = z_values - z500_trend[:, np.newaxis, np.newaxis]
+
+dy_z500['Z_detrended'] = (('time','lat','lon'), z_values_detrended)
+
+# Here you select the extreme days
+ds = dy_z500.sel(time=extreme_pr_days_list, method="nearest")          
 
 time_values = ds['time'].values
-z_values = ds['Z'].values
-z_values = z_values / g
-lon = ds['lon'].values  #they are the same for the two variables 
-lat = ds['lat'].values
-
-nday =int((ds['time'].size))  # number of extreme days
-nlat = int((ds['lat'].size))
-nlon = int((ds['lon'].size))
-
-#  reshape and standardization ( new_x = x - x_mean / standard_deviation )
-z500_2d = z_values.reshape(nday, -1)        #reshape 
-scaler_z500 = StandardScaler()
-z_values_scaled = scaler_z500.fit_transform(z500_2d)
+z_values = ds['Z_detrended'].values
 
 #%%
 # =============================================================================
-
-# loading the second variable
-# MSLP 
+# 2b) loading mSLP
 print("   Loading mslp...")
-name_file_mslp = "ERA5_daily_mean_mSLP_sfc_" + str(start_year) + "_" + str(end_year) + "_EU3_anomalies.nc"
-dy = xr.open_mfdataset(data_path_ERA5 + name_file_mslp,    #Xarray features will be used throughout this tutorial 
+name_file_mslp = "ERA5_daily_mean_mSLP_sfc_1984_2024_EU3_anomalies_clim1985_2019.nc"
+dy_mslp = xr.open_mfdataset(data_path_ERA5 + name_file_mslp,    #Xarray features will be used throughout this tutorial 
                          preprocess=select_latlon)
-ds = dy.sel(time=extreme_pr_days_list, method="nearest") 
+ds = dy_mslp.sel(time=extreme_pr_days_list, method="nearest") 
+#ds = dy
 #print(ds)
 
 #time_values = ds['time'].values    #should be the same
 mslp_values = ds['MSL'].values
 mslp_values = mslp_values /100
+
+#weights_matrix = np.tile(weights_lat, 193).reshape((101,193))
+# do not use reshape since it change the values a little
+
+weights_matrix = np.tile(weights_lat[:, np.newaxis], (1, 193))
+#diff = weights_matrix[:,10] - weights_lat #should be all 0s
+
+z_values = np.multiply(z_values, weights_matrix)
+mslp_values = np.multiply(mslp_values, weights_matrix) #weights
+print("     Z500: ", z_values.shape)
+print("     mSLP: ", mslp_values.shape)
+
 som_variables_str = "Z500_mSLP"
-#Z500
-
-mslp_2d = mslp_values.reshape(nday, -1)        #reshape 
-scaler_mslp = StandardScaler()
-mslp_scaled = scaler_mslp.fit_transform(mslp_2d)
-
-# reshape and standardization ( new_x = x - x_mean / standard_deviation )
-z500_reshaped = z_values_scaled.reshape(nday, nlat, nlon)
-print(z500_reshaped.shape)
-mslp_reshaped = mslp_scaled.reshape(nday, nlat, nlon)
 
 #%%
-print("  check the shape:")
-print("   z500_reshaped", z500_reshaped.shape, "   mslp_reshaped", mslp_reshaped.shape)
+######################################################
+############# PREPROCESSING THE DATA #################
+######################################################
 
-temp_array = np.stack([z500_reshaped, mslp_reshaped], axis=-1)   #stack into new axis
-temp_array.shape
-z500_mslp_arr = temp_array.reshape(nday, -1)        #reshape 
+# Here you
+# 3a) do train - test split,
+# 3b) Standard Scaler fit on training set, transform and reshape
+# 3c) stack variables and perform PCA
 
-print("  stacking Z500 and mSLP,")
-print("   new array shape: ", z500_mslp_arr.shape)
-
-# 2b) Pre-processing
 print(" -Preprocessing data train and test split-")
-# data train - test SPLIT
+# 3a) data train - test SPLIT
 print("   lenght of all data:" + str(len(time_values)))
 train_perc = round(len(time_values)*70/100)
 print("   lenght of train data:" + str(train_perc))
 test_perc = len(time_values) - train_perc
 print("   lenght of test data:" + str(test_perc))
 
-data_train = z500_mslp_arr[:train_perc]
-data_test = z500_mslp_arr[train_perc:]
-all_data = z500_mslp_arr
-print("   data train shape:", data_train.shape)
-print("   data test shape: ", data_test.shape)
+# TRAIN DATASET 
+z500_train = z_values[:train_perc]
+mslp_train = mslp_values[:train_perc]
+nday_train = len(z500_train)
 
-#%%
-## 2c) PCA
+# TEST DATASET
+z500_test = z_values[train_perc:]
+mslp_test = mslp_values[train_perc:]
+nday_test = len(z500_test)
+
+# EXTREME DATASET (all data)
+z500_extremes = z_values
+mslp_extremes = mslp_values
+nday_extremes = len(z500_extremes)
+
+# 3b) Standard Scaler fit on training set 
+print("1", z500_train.shape)
+scaler_z500 = StandardScaler().fit(z500_train.reshape(len(z500_train), -1))
+scaler_mslp = StandardScaler().fit(mslp_train.reshape(len(mslp_train), -1))
+
+z500_train_scaled = scaler_z500.transform(z500_train.reshape(len(z500_train), -1))
+mslp_train_scaled = scaler_mslp.transform(mslp_train.reshape(len(mslp_train), -1))
+
+z500_test_scaled = scaler_z500.transform(z500_test.reshape(len(z500_test), -1))
+mslp_test_scaled = scaler_mslp.transform(mslp_test.reshape(len(mslp_test), -1))
+
+z500_extremes_scaled = scaler_z500.transform(z500_extremes.reshape(len(z500_extremes), -1)) # all data - extremes 
+mslp_extremes_scaled = scaler_mslp.transform(mslp_extremes.reshape(len(mslp_extremes), -1))
+
+# reshape 
+z500_train_scaled = z500_train_scaled.reshape(nday_train, nlat, nlon)
+mslp_train_scaled = mslp_train_scaled.reshape(nday_train, nlat, nlon)
+
+z500_test_scaled = z500_test_scaled.reshape(nday_test, nlat, nlon)
+mslp_test_scaled = mslp_test_scaled.reshape(nday_test, nlat, nlon)
+
+z500_extremes_scaled = z500_extremes_scaled.reshape(nday_extremes, nlat, nlon)
+mslp_extremes_scaled = mslp_extremes_scaled.reshape(nday_extremes, nlat, nlon)
+
+# 3c) stack variables and perform PCA 
+print("-Stacking and performing PCA")
+train_combined = np.stack([z500_train_scaled, mslp_train_scaled], axis=-1)
+test_combined = np.stack([z500_test_scaled, mslp_test_scaled], axis=-1)
+extremes_combined = np.stack((z500_extremes_scaled, mslp_extremes_scaled), axis=-1)
+
+train_combined = train_combined.reshape(nday_train, -1)
+test_combined = test_combined.reshape(nday_test, -1)
+extremes_combined = extremes_combined.reshape(nday_extremes, -1)
+
+print(extremes_combined.shape)
+
+# PCA 
 print(" -PCA-")
 # Cumulative Explained Variance vs Number of Components
-# Uncomment 
 pca = PCA()
-pca.fit(data_train)
+pca.fit(train_combined)
 # Calculate cumulative explained variance
 cumulative_explained_variance = np.cumsum(pca.explained_variance_ratio_)
 
@@ -209,10 +297,9 @@ plt.xlim(0,50)
 #plt.savefig("tuningFinale/0_CumulativeExplainedVariance" + pr_dataset_str + ".svg")
 plt.show()
 
-#%%
-# pca on train set
-folderpath_tuning = 'tuningFinale/'  # Output of tuning section, if you want to save your resulrs
-
+######################################################
+#################### TUNING ##########################
+######################################################
 # first is to assess the best function, then sigma and LR
 
 # Explained variance vs QE vs Neighborhood function
@@ -242,22 +329,22 @@ for neighborhood_function_index in range(len(neighborhood_function_list)):
         
     for n_index in n_index_list:
         print("n_comp.: ", n_index)
-        pca = PCA(n_components=n_index) # Keeps % of the variance
-        data_train_pca = pca.fit_transform(data_train)
-        data_test_pca = pca.transform(data_test)
-        #all_data_pca = pca.transform(all_data_std)
-        
+        pca = PCA(n_components=n_index).fit(train_combined)
+        data_train_pca = pca.transform(train_combined)
+        data_test_pca = pca.transform(test_combined)
+        extremes_pca = pca.transform(extremes_combined)
+       
         input_length = len(data_train_pca[0])  #This is value is the the length of the latitude X longitude. It is the second value in the data_train.shape step. 
         
         # SOM
-        era5_hourly_som1 = minisom.MiniSom(som_row, som_col, input_len = input_length, sigma = sigma, learning_rate=learning_rate, neighborhood_function=neighborhood_function, decay_function = asymptotic_decay)
-        era5_hourly_som1.random_weights_init(data_train_pca)
+        era5_som = minisom.MiniSom(som_row, som_col, input_len = input_length, sigma = sigma, learning_rate=learning_rate, neighborhood_function=neighborhood_function, decay_function = asymptotic_decay)
+        era5_som.random_weights_init(data_train_pca)
         # train som
-        era5_hourly_som1.train(data_train_pca, num_iteration=100000,random_order=True, verbose=True) 
+        era5_som.train(data_train_pca, num_iteration=100000,random_order=True, verbose=True) 
         
-        q_error = round(era5_hourly_som1.quantization_error(data_test_pca),3) # we assess the q_error on the test set
+        q_error = round(era5_som.quantization_error(data_test_pca),3) # we assess the q_error on the test set
         q_error_list += [q_error]
-        t_error = round(era5_hourly_som1.topographic_error(data_test_pca),3)
+        t_error = round(era5_som.topographic_error(data_test_pca),3)
         t_error_list += [t_error]
         #if q_error < q_win:
         #    q_win = q_error
@@ -288,15 +375,15 @@ q_error_list_cicle = []
 t_error_list_cicle = []
 
 
-
 plt.figure(figsize=(10,6))
 plt.title("Sigma and LR vs QE")
 plt.xlabel("Sigma")
 plt.ylabel("Quantization error")
     
-pca = PCA(n_components=0.95) # Keeps 95% of the variance
-data_train_pca = pca.fit_transform(data_train)
-data_test_pca = pca.transform(data_test)
+
+pca = PCA(n_components=0.95).fit(train_combined) # Keeps 95% of the variance
+data_train_pca = pca.transform(train_combined)
+data_test_pca = pca.transform(test_combined)
         
 
 for l_rate_index in range(len(learning_rate_list)):
@@ -315,14 +402,14 @@ for l_rate_index in range(len(learning_rate_list)):
         input_length = len(data_train_pca[0])  #This is value is the the length of the latitude X longitude. It is the second value in the data_train.shape step. 
         
         # SOM
-        era5_hourly_som1 = minisom.MiniSom(som_row, som_col, input_len = input_length, sigma = sigma, learning_rate=learning_rate, neighborhood_function='gaussian', decay_function = asymptotic_decay)
-        era5_hourly_som1.random_weights_init(data_train_pca)
+        era5_som = minisom.MiniSom(som_row, som_col, input_len = input_length, sigma = sigma, learning_rate=learning_rate, neighborhood_function='gaussian', decay_function = asymptotic_decay)
+        era5_som.random_weights_init(data_train_pca)
         # train som
-        era5_hourly_som1.train(data_train_pca, num_iteration=100000,random_order=True, verbose=True)
+        era5_som.train(data_train_pca, num_iteration=100000,random_order=True, verbose=True)
         
-        q_error = round(era5_hourly_som1.quantization_error(data_test_pca),3)
+        q_error = round(era5_som.quantization_error(data_test_pca),3)
         q_error_list += [q_error]
-        t_error = round(era5_hourly_som1.topographic_error(data_test_pca),3)
+        t_error = round(era5_som.topographic_error(data_test_pca),3)
         t_error_list += [t_error]
         #if q_error < q_win:
         #    q_win = q_error
@@ -343,7 +430,7 @@ plt.savefig(folderpath_tuning+ "2_" + pr_dataset_str + "_" + str(start_year) + "
 ## MY FINAL CONFIGURATION
 # gaussian
 # ARCIS, 2X2: sigma = 1, LR = 0.002
-# CERRA Land, 3x2: sigma = 1, LR = 0.005
+# CERRA, 3x2: sigma = 1, LR = 0.005
 
 
 
