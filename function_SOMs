@@ -142,7 +142,11 @@ def ERA5_IVT(path_file, start_time, end_time, domain=None):
     # preprocessing 
 
     if domain == "EU3":
-        dset = ds.sel(lat = slice(60,25), lon = slice(-13,35))
+        try:
+            dset = ds.sel(lat = slice(60,25), lon = slice(-13,35))
+        except KeyError:
+            dset = ds.sel(latitude = slice(60,25), longitude = slice(0,35))
+
     elif domain=="IT":
         dset = ds.sel(lat = slice(48,36), lon = slice(6,19)) # italy
     else :
@@ -169,10 +173,32 @@ def ERA5_IVT(path_file, start_time, end_time, domain=None):
 
 #%% DATAFRAME MANIPULATIONS
 def dataframe_cut_xlsx(path_xlsx_file, first_year, last_year, exclude_last_row=False):
-    # function to cut a selected dataset from a bigger one
-    # check 
-    # - first column is the column of times
-    # - the format of the dates
+    """
+    function to cut a selected dataset from a bigger one with a filter on the years
+
+    check 
+    - first column is the column of times
+    - the format of the dates
+    
+    Parameters
+    ----------
+    path_xlsx_file : string
+        path of excel file.
+    first_year : int
+        first year to select.
+    last_year : int
+        last year to select.
+    exclude_last_row : True/False, optional
+        to exclude the last row if necessary. The default is False.
+
+    Returns
+    -------
+    data_raw : dataset
+        original raw dataset.
+    df_select : dataset
+        filtered dataset.
+
+    """
     data_raw= pd.read_excel(path_xlsx_file)
     data_tmp = data_raw
     
@@ -188,6 +214,75 @@ def dataframe_cut_xlsx(path_xlsx_file, first_year, last_year, exclude_last_row=F
     # do the time mask
     time_mask = (data['Time'].dt.year >= first_year) & \
                 (data['Time'].dt.year <= last_year)
+    # select the data
+    data[time_mask]
+    choseInd = [ind for ind in data[time_mask].index]
+    
+    df_select = data.loc[choseInd]
+    
+    return data_raw, df_select
+
+def dataframe_cut_xlsx_month(path_xlsx_file, first_year, last_year, first_month, last_month, exclude_last_row=False):
+    """
+    function to cut a selected dataset from a bigger one 
+    considering not only the start and end year but also the start and end month
+
+    check 
+    - first column is the column of times
+    - the format of the dates
+    
+    Parameters
+    ----------
+    path_xlsx_file : string
+        path of excel file.
+    first_year : int
+        first year to select.
+    last_year : int
+        last year to select.
+    first_month : int
+        first month of the first year.
+    last_month : int
+        last month of the last year.
+    exclude_last_row : True/False, optional
+        to exclude the last row if necessary. The default is False.
+
+    Returns
+    -------
+    data_raw : dataset
+        original raw dataset.
+    df_select : dataset
+        filtered dataset.
+
+    """
+
+    data_raw= pd.read_excel(path_xlsx_file)
+    data_tmp = data_raw
+    
+    if exclude_last_row == True:
+        data_tmp = data_raw.iloc[:-1]
+        
+    label_first_column = data_tmp.columns[0] #get the label of the first column
+
+    data = data_tmp.rename(columns={ label_first_column : "Time"}) #change the label
+    
+    data['Time'] = pd.to_datetime(data['Time'])
+    #data['Time'] = data['Time'].apply(pd.to_datetime)
+    # do the time mask
+    if first_month < 10 :
+        start_month_year_str = str(first_year) + "-0" + str(first_month)
+    else : 
+        start_month_year_str = str(first_year) + "-" + str(first_month)
+    
+    if last_month < 10 :
+        last_month_year_str = str(last_year) + "-0" + str(last_month)
+    else : 
+        last_month_year_str = str(last_year) + "-" + str(last_month)
+    
+    print("time mask from " + start_month_year_str)
+    print("to " + last_month_year_str)
+    
+    time_mask = (data['Time'].dt.strftime('%Y-%m') >= start_month_year_str) & \
+                (data['Time'].dt.strftime('%Y-%m') <= last_month_year_str) 
     # select the data
     data[time_mask]
     choseInd = [ind for ind in data[time_mask].index]
@@ -260,6 +355,39 @@ def add_pr_max_column(dataset, idx_first_c, idx_last_c):
     #new_df = dataset.insert[1, "Pr Max", pr_max_c]
     
     return dataset
+
+def add_pr_sum_column(dataset, idx_first_c, idx_last_c):
+    idx_stop = idx_last_c + 1
+    df_cutted = dataset.iloc[:, idx_first_c: idx_stop]
+    print(df_cutted)
+    pr_sum_c = df_cutted.sum(axis=1)
+    dataset["PrSum"]=pr_sum_c
+    dataset["N_WA"]=df_cutted.astype(bool).sum(axis=1)
+    dataset["Avg_pr_WA"]=dataset["PrSum"]/dataset["N_WA"]
+    #new_df = dataset.insert[1, "Pr Max", pr_max_c]
+    
+    return dataset, df_cutted
+
+def add_pr_sum_column_filtered(dataset, p99, idx_first_c, idx_last_c):
+    p99 = p99.tolist()
+    idx_stop = idx_last_c + 1
+    df_filtered = dataset.iloc[:, idx_first_c: idx_stop]
+    #print(df_filtered)
+    for col, percentile in zip(df_filtered.columns, p99):
+        df_filtered[col] = df_filtered[col].apply(lambda x: x if x > percentile else 0)    
+    #print(df_filtered)
+    pr_sum_c = df_filtered.sum(axis=1)
+    
+    dataset["PrSum"]=pr_sum_c
+    #print(dataset["PrSum"])
+    dataset["N_WA"]=df_filtered.astype(bool).sum(axis=1)
+    dataset["Avg_pr_WA"]=dataset["PrSum"]/dataset["N_WA"]
+
+    df_filtered.insert(loc=0, column='Time', value=dataset["Time"])
+    #df_filtered["N_WA"]=df_filtered.astype(bool).sum(axis=1)
+    #df_filtered["Avg_pr_WA"]=df_filtered["PrSum"]/df_filtered["N_WA"]
+
+    return dataset, df_filtered
 
 #%% COMPOSITES
 def divide_dates_by_index(list_of_dates, list_of_indices, number_indices):
@@ -389,8 +517,8 @@ def single_generate_SOM_composites_Z500_mslp(data_lon, data_lat, data_shaded, da
     cbar.ax.tick_params(labelsize=24)
 
     #plt.suptitle('Composites of Z500 (shaded) and mSLP (contour). ' + pr_dataset_str + ",  Master SOM of " + som_variables_str, x= 0.33 ,fontsize=27)   
-    #plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_mSLP_'  + test_or_all + '.png', bbox_inches='tight')
-    #plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_mSLP_'  + test_or_all + '.svg', bbox_inches='tight')
+    plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_mSLP_'  + test_or_all + '.png', bbox_inches='tight')
+    plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_mSLP_'  + test_or_all + '.svg', bbox_inches='tight')
     plt.show()
     
 def single_generate_SOM_composites_Z500_mslp_it(data_lon, data_lat, data_shaded, data_contour, som_col, som_row, name_som, folderpath, pattern_list, test_or_all=None, chosen_map="RdYlBu_r"):
@@ -457,8 +585,8 @@ def single_generate_SOM_composites_Z500_mslp_it(data_lon, data_lat, data_shaded,
     cbar.ax.tick_params(labelsize=24)
 
     #plt.suptitle('Composites of Z500 (shaded) and mSLP (contour). ' + pr_dataset_str + ",  Master SOM of " + som_variables_str, x= 0.33 ,fontsize=27)   
-    #plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_mSLP_'  + test_or_all + 'IT.png', bbox_inches='tight')
-    #plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_mSLP_'  + test_or_all + 'IT.svg', bbox_inches='tight')
+    plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_mSLP_'  + test_or_all + 'IT.png', bbox_inches='tight')
+    plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_mSLP_'  + test_or_all + 'IT.svg', bbox_inches='tight')
     plt.show()
     
 def single_generate_SOM_composites_Z500_TCWV_IVT(z_lon, z_lat, TCWV_lon, TCWV_lat, IVT_lon, IVT_lat, data_shaded, data_contour, ivte, ivtn, som_col, som_row, name_som, folderpath, pattern_list, test_or_all=None, chosen_map= "RdYlBu_r"):
@@ -585,8 +713,8 @@ def single_generate_SOM_composites_Z500_TCWV_IVT(z_lon, z_lat, TCWV_lon, TCWV_la
     
     #plt.suptitle('Composites of Z500 (contour), TCWV (shaded) and IVT (arrows). ' + pr_dataset_str + ", Master SOM of " + som_variables_str, x= 0.33 ,fontsize=27)   
     #plt.savefig(folderpath + 'Composites_Z500_TCWV_IVT_' +names_som[i]+ '_' + test_or_all + '_v2.png', bbox_inches='tight')
-    #plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_TCWV_IVT_'  + test_or_all + '.png', bbox_inches='tight')
-    #plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_TCWV_IVT_'  +test_or_all + '.svg', bbox_inches='tight')
+    plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_TCWV_IVT_'  + test_or_all + '.png', bbox_inches='tight')
+    plt.savefig(folderpath + name_som + '_' + 'Composites_Z500_TCWV_IVT_'  +test_or_all + '.svg', bbox_inches='tight')
     plt.show()
     
 #%% SEASONALITY
@@ -625,6 +753,20 @@ def get_season(date):
         return 'JJA'
     else:
         return 'SON'
-        return 'JJA'
-    else:
-        return 'SON'
+    
+
+def masking_distances(winner_coordinates, distances_matrix, som_shape):
+    # with np.ravel_multi_index we convert the bidimensional
+    # coordinates to a monodimensional index
+    print("Applying mask on euclidean distances...")
+    cluster_index = np.ravel_multi_index(winner_coordinates, som_shape)
+
+    mask = np.full_like(distances_matrix, False, dtype=bool)
+    rows = np.arange(distances_matrix.shape[0]) # number of the rows
+    cols = np.array(cluster_index) # number of the columns to save
+    mask[rows, cols] = True
+
+    # Masking 
+    distances_matrix_with_mask = np.where(mask, distances_matrix, np.nan)
+
+    return distances_matrix_with_mask
