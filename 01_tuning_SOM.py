@@ -357,7 +357,7 @@ for neighborhood_function_index in range(len(neighborhood_function_list)):
     q_error_list_cicle += [q_error_list]
     t_error_list_cicle += [t_error_list]
     
-plt.savefig(folderpath_tuning + "1_" + pr_dataset_str + "_" + str(start_year) + "_" + str(end_year) + "_" + str(som_row) + "x" + str(col) + "_QE_test_variable_nf_LR0_0005_sigma1.svg", format="svg")
+plt.savefig(folderpath_tuning + "1_" + pr_dataset_str + "_" + str(start_year) + "_" + str(end_year) + "_" + str(som_row) + "x" + str(som_col) + "_QE_test_variable_nf_LR0_0005_sigma1.svg", format="svg")
 
 
 #%% Assesing sigma and LR
@@ -423,8 +423,8 @@ for l_rate_index in range(len(learning_rate_list)):
     q_error_list_cicle += [q_error_list]
     t_error_list_cicle += [t_error_list]
     
-plt.savefig(folderpath_tuning+ "2_" + pr_dataset_str + "_" + str(start_year) + "_" + str(end_year) + "_" + str(som_row) + "x" + str(col) + "_QE_test_LR_sigma_variable_gaussian.svg", format="svg")
-plt.savefig(folderpath_tuning+ "2_" + pr_dataset_str + "_" + str(start_year) + "_" + str(end_year) + "_" + str(som_row) + "x" + str(col) + "_QE_test_LR_sigma_variable_gaussian.png")
+plt.savefig(folderpath_tuning+ "2_" + pr_dataset_str + "_" + str(start_year) + "_" + str(end_year) + "_" + str(som_row) + "x" + str(som_col) + "_QE_test_LR_sigma_variable_gaussian.svg", format="svg")
+plt.savefig(folderpath_tuning+ "2_" + pr_dataset_str + "_" + str(start_year) + "_" + str(end_year) + "_" + str(som_row) + "x" + str(som_col) + "_QE_test_LR_sigma_variable_gaussian.png")
 
 
 ## MY FINAL CONFIGURATION
